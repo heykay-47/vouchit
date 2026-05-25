@@ -1,0 +1,72 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist
+build
+
+# Environment variables and secrets
+.env*
+!.env.example
+
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation (but keep deployment related ones)
+README.md
+!DEPLOYMENT.md
+
+# Test coverage and reports
+coverage
+.nyc_output
+test-results
+playwright-report
+
+# Cache directories
+.cache
+.parcel-cache
+.next
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Development only files
+.eslintrc*
+.prettierrc*
+jest.config.*
+cypress.json
+cypress/
+
+# DigitalOcean specific
+.do/
+
+# Supabase development files
+supabase/
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.temp

@@ -1,0 +1,26 @@
+name: voucherswap
+region: nyc
+services:
+- name: web
+  source_dir: /
+  github:
+    repo: heykay-47/voucherswap
+    branch: main
+    deploy_on_push: true
+  run_command: nginx -g "daemon off;"
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  dockerfile_path: Dockerfile
+  http_port: 8080
+  health_check:
+    http_path: /health
+  routes:
+  - path: /
+  envs:
+  - key: VITE_SUPABASE_URL
+    scope: BUILD_TIME
+    type: SECRET
+  - key: VITE_SUPABASE_ANON_KEY
+    scope: BUILD_TIME
+    type: SECRET
