@@ -11,5 +11,5 @@ const reportedVoucherSchema = new Schema(
 
 reportedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
-export const ReportedVoucher =
-  mongoose.models.ReportedVoucher || mongoose.model('ReportedVoucher', reportedVoucherSchema);
+export const ReportedVoucher: mongoose.Model<any> =
+  (mongoose.models.ReportedVoucher as mongoose.Model<any>) || mongoose.model('ReportedVoucher', reportedVoucherSchema);

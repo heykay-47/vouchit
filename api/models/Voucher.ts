@@ -22,4 +22,5 @@ const voucherSchema = new Schema(
 );
 
 export type VoucherDocument = InferSchemaType<typeof voucherSchema> & { _id: mongoose.Types.ObjectId };
-export const Voucher = mongoose.models.Voucher || mongoose.model('Voucher', voucherSchema);
+export const Voucher: mongoose.Model<any> =
+  (mongoose.models.Voucher as mongoose.Model<any>) || mongoose.model('Voucher', voucherSchema);

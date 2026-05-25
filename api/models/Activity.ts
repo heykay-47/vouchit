@@ -12,4 +12,5 @@ const activitySchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
-export const Activity = mongoose.models.Activity || mongoose.model('Activity', activitySchema);
+export const Activity: mongoose.Model<any> =
+  (mongoose.models.Activity as mongoose.Model<any>) || mongoose.model('Activity', activitySchema);

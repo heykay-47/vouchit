@@ -11,5 +11,5 @@ const redeemedVoucherSchema = new Schema(
 
 redeemedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
-export const RedeemedVoucher =
-  mongoose.models.RedeemedVoucher || mongoose.model('RedeemedVoucher', redeemedVoucherSchema);
+export const RedeemedVoucher: mongoose.Model<any> =
+  (mongoose.models.RedeemedVoucher as mongoose.Model<any>) || mongoose.model('RedeemedVoucher', redeemedVoucherSchema);

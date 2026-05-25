@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
-import { authRouter } from './routes/auth';
-import { communityRouter } from './routes/community';
-import { usersRouter } from './routes/users';
-import { vouchersRouter } from './routes/vouchers';
-import { errorHandler } from './middleware/error-handler';
+import { authRouter } from './routes/auth.js';
+import { communityRouter } from './routes/community.js';
+import { usersRouter } from './routes/users.js';
+import { vouchersRouter } from './routes/vouchers.js';
+import { errorHandler } from './middleware/error-handler.js';
 
 export const createApp = () => {
   const app = express();

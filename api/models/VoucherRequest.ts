@@ -12,5 +12,5 @@ const voucherRequestSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: true } }
 );
 
-export const VoucherRequest =
-  mongoose.models.VoucherRequest || mongoose.model('VoucherRequest', voucherRequestSchema);
+export const VoucherRequest: mongoose.Model<any> =
+  (mongoose.models.VoucherRequest as mongoose.Model<any>) || mongoose.model('VoucherRequest', voucherRequestSchema);

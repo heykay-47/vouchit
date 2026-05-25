@@ -10,4 +10,5 @@ const favoriteSchema = new Schema(
 
 favoriteSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
-export const Favorite = mongoose.models.Favorite || mongoose.model('Favorite', favoriteSchema);
+export const Favorite: mongoose.Model<any> =
+  (mongoose.models.Favorite as mongoose.Model<any>) || mongoose.model('Favorite', favoriteSchema);

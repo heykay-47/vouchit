@@ -9,4 +9,5 @@ const commentSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
-export const Comment = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
+export const Comment: mongoose.Model<any> =
+  (mongoose.models.Comment as mongoose.Model<any>) || mongoose.model('Comment', commentSchema);

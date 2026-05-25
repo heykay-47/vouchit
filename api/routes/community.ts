@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { connectDb } from '../lib/db';
-import { asyncRoute, ok } from '../lib/http';
-import { requireAuth, type AuthedRequest } from '../middleware/auth';
-import { Activity } from '../models/Activity';
-import { Notification } from '../models/Notification';
-import { User } from '../models/User';
-import { Voucher } from '../models/Voucher';
-import { VoucherRequest } from '../models/VoucherRequest';
+import { connectDb } from '../lib/db.js';
+import { asyncRoute, ok } from '../lib/http.js';
+import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { Activity } from '../models/Activity.js';
+import { Notification } from '../models/Notification.js';
+import { User } from '../models/User.js';
+import { Voucher } from '../models/Voucher.js';
+import { VoucherRequest } from '../models/VoucherRequest.js';
 
 const router = Router();
 
@@ -49,7 +49,7 @@ router.get('/requests', asyncRoute(async (_req, res) => {
   await connectDb();
   const requests = await VoucherRequest.find().sort({ createdAt: -1 });
   const users = await User.find({ _id: { $in: requests.map((request: any) => request.userId) } });
-  const names = new Map(users.map((user: any) => [user._id.toString(), user.username]));
+  const names = new Map<string, string>(users.map((user: any) => [user._id.toString(), user.username]));
 
   ok(res, {
     requests: requests.map((request: any) => toRequestResponse(request, names.get(request.userId.toString()))),
@@ -92,7 +92,7 @@ router.get('/leaderboard', asyncRoute(async (_req, res) => {
     { $limit: 10 },
   ]);
   const users = await User.find({ _id: { $in: rows.map((row: any) => row._id) } });
-  const byId = new Map(users.map((user: any) => [user._id.toString(), user]));
+  const byId = new Map<string, any>(users.map((user: any) => [user._id.toString(), user]));
 
   ok(res, {
     contributors: rows.map((row: any) => {

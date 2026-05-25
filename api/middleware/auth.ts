@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { parse } from 'cookie';
-import { ApiError } from '../lib/http';
-import { verifyAuthToken } from '../lib/token';
+import { ApiError } from '../lib/http.js';
+import { verifyAuthToken } from '../lib/token.js';
 
 export type AuthedRequest = Request & {
   userId: string;

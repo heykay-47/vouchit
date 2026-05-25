@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { connectDb } from '../lib/db';
-import { ApiError, asyncRoute, ok } from '../lib/http';
-import { hashPassword, verifyPassword } from '../lib/password';
-import { clearAuthCookie, createAuthCookie, signAuthToken } from '../lib/token';
-import { requireAuth, type AuthedRequest } from '../middleware/auth';
-import { Favorite } from '../models/Favorite';
-import { RedeemedVoucher } from '../models/RedeemedVoucher';
-import { User } from '../models/User';
+import { connectDb } from '../lib/db.js';
+import { ApiError, asyncRoute, ok } from '../lib/http.js';
+import { hashPassword, verifyPassword } from '../lib/password.js';
+import { clearAuthCookie, createAuthCookie, signAuthToken } from '../lib/token.js';
+import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { Favorite } from '../models/Favorite.js';
+import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
+import { User } from '../models/User.js';
 
 const router = Router();
 

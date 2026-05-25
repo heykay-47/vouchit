@@ -12,5 +12,5 @@ const notificationSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
-export const Notification =
-  mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
+export const Notification: mongoose.Model<any> =
+  (mongoose.models.Notification as mongoose.Model<any>) || mongoose.model('Notification', notificationSchema);

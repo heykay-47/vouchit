@@ -1,5 +1,6 @@
 import { serialize } from 'cookie';
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 
 export type AuthTokenPayload = {
   userId: string;
@@ -12,7 +13,7 @@ const getJwtSecret = () => {
   return process.env.JWT_SECRET;
 };
 
-export const signAuthToken = (payload: AuthTokenPayload, expiresIn: string | number) => {
+export const signAuthToken = (payload: AuthTokenPayload, expiresIn: SignOptions['expiresIn']) => {
   return jwt.sign(payload, getJwtSecret(), { expiresIn });
 };
 

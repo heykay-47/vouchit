@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
-import { connectDb } from '../lib/db';
-import { ApiError, asyncRoute, ok } from '../lib/http';
-import { requireAuth, type AuthedRequest } from '../middleware/auth';
-import { Activity } from '../models/Activity';
-import { Comment } from '../models/Comment';
-import { RedeemedVoucher } from '../models/RedeemedVoucher';
-import { ReportedVoucher } from '../models/ReportedVoucher';
-import { User } from '../models/User';
-import { Voucher } from '../models/Voucher';
+import { connectDb } from '../lib/db.js';
+import { ApiError, asyncRoute, ok } from '../lib/http.js';
+import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { Activity } from '../models/Activity.js';
+import { Comment } from '../models/Comment.js';
+import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
+import { ReportedVoucher } from '../models/ReportedVoucher.js';
+import { User } from '../models/User.js';
+import { Voucher } from '../models/Voucher.js';
 
 const router = Router();
 

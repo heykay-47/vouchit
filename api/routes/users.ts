@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { connectDb } from '../lib/db';
-import { ApiError, asyncRoute, ok } from '../lib/http';
-import { requireAuth, type AuthedRequest } from '../middleware/auth';
-import { Favorite } from '../models/Favorite';
-import { User } from '../models/User';
+import { connectDb } from '../lib/db.js';
+import { ApiError, asyncRoute, ok } from '../lib/http.js';
+import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { Favorite } from '../models/Favorite.js';
+import { User } from '../models/User.js';
 
 const router = Router();
 router.use(requireAuth);
