@@ -100,6 +100,8 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 
 ### Vercel
 
+For the full free recruiter demo checklist, see [`DEMO_DEPLOYMENT.md`](DEMO_DEPLOYMENT.md).
+
 Set these environment variables in the Vercel dashboard:
 
 ```env

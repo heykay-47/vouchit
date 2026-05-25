@@ -42,7 +42,8 @@
     "test:security": "npm run security:check && npm run type-check",
     "install:devtools": "npm install --save-dev @tanstack/react-query-devtools@^5.56.2",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.0",
