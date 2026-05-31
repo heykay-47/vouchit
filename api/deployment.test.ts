@@ -4,6 +4,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('Vercel deployment configuration', () => {
+  it('exports the Express app directly for Vercel', async () => {
+    const entrypoint = await import('./[...path]');
+
+    expect(entrypoint.default).toHaveProperty('handle');
+  });
+
   it('does not set X-Frame-Options from HTML meta tags', () => {
     const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 
