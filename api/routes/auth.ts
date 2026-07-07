@@ -5,8 +5,7 @@ import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { clearAuthCookie, createAuthCookie, signAuthToken } from '../lib/token.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
-import { Favorite } from '../models/Favorite.js';
-import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
+import { toUserResponse } from '../lib/serializers.js';
 import { User } from '../models/User.js';
 
 const router = Router();
@@ -23,26 +22,6 @@ const loginSchema = z.object({
   password: z.string().min(1),
   rememberMe: z.boolean().optional().default(false),
 });
-
-const toUserResponse = async (user: any) => {
-  const userId = user._id.toString();
-  const [favorites, redeemedVouchers] = await Promise.all([
-    Favorite.find({ userId }),
-    RedeemedVoucher.find({ userId }),
-  ]);
-
-  return {
-    id: userId,
-    email: user.email,
-    username: user.username,
-    bio: user.bio ?? undefined,
-    profileImage: user.profileImage ?? undefined,
-    notificationPreferences: user.notificationPreferences,
-    createdAt: user.createdAt,
-    favorites: favorites.map((favorite: any) => favorite.voucherId.toString()),
-    redeemedVouchers: redeemedVouchers.map((redeemed: any) => redeemed.voucherId.toString()),
-  };
-};
 
 router.post('/signup', asyncRoute(async (req, res) => {
   await connectDb();
