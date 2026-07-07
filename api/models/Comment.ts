@@ -9,5 +9,7 @@ const commentSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
+commentSchema.index({ voucherId: 1, createdAt: 1 });
+
 export const Comment: mongoose.Model<any> =
   (mongoose.models.Comment as mongoose.Model<any>) || mongoose.model('Comment', commentSchema);

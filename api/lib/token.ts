@@ -1,6 +1,5 @@
 import { serialize } from 'cookie';
-import jwt from 'jsonwebtoken';
-import type { SignOptions } from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 
 export type AuthTokenPayload = {
   userId: string;

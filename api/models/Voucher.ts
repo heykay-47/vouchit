@@ -21,6 +21,9 @@ const voucherSchema = new Schema(
   { timestamps: true }
 );
 
+voucherSchema.index({ isActive: 1, isRedeemed: 1, donatedAt: -1 });
+voucherSchema.index({ donatedBy: 1 });
+
 export type VoucherDocument = InferSchemaType<typeof voucherSchema> & { _id: mongoose.Types.ObjectId };
 export const Voucher: mongoose.Model<any> =
   (mongoose.models.Voucher as mongoose.Model<any>) || mongoose.model('Voucher', voucherSchema);

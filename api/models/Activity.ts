@@ -12,5 +12,7 @@ const activitySchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
+activitySchema.index({ createdAt: -1 });
+
 export const Activity: mongoose.Model<any> =
   (mongoose.models.Activity as mongoose.Model<any>) || mongoose.model('Activity', activitySchema);

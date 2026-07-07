@@ -12,5 +12,7 @@ const voucherRequestSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: true } }
 );
 
+voucherRequestSchema.index({ createdAt: -1 });
+
 export const VoucherRequest: mongoose.Model<any> =
   (mongoose.models.VoucherRequest as mongoose.Model<any>) || mongoose.model('VoucherRequest', voucherRequestSchema);

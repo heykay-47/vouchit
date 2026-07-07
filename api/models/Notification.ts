@@ -12,5 +12,7 @@ const notificationSchema = new Schema(
   { timestamps: { createdAt: 'createdAt', updatedAt: false } }
 );
 
+notificationSchema.index({ userId: 1, createdAt: -1 });
+
 export const Notification: mongoose.Model<any> =
   (mongoose.models.Notification as mongoose.Model<any>) || mongoose.model('Notification', notificationSchema);
