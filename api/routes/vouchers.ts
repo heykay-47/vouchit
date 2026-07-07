@@ -18,10 +18,18 @@ const voucherSchema = z.object({
   title: z.string().min(1).max(120),
   description: z.string().min(1).max(1000),
   code: z.string().min(1).max(200),
-  imageUrl: z.string().min(1),
+  imageUrl: z.string().url().refine(
+    (u) => u.startsWith('https://') || u.startsWith('data:image/'),
+    'Image URL must be https or a data:image URL',
+  ),
   expiryDate: z.string().datetime().optional().nullable(),
   value: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
+});
+
+const listSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
 });
 
 const toVoucherResponse = (voucher: any) => ({
@@ -29,7 +37,6 @@ const toVoucherResponse = (voucher: any) => ({
   platform: voucher.platform,
   title: voucher.title,
   description: voucher.description,
-  code: voucher.code,
   imageUrl: voucher.imageUrl,
   expiryDate: voucher.expiryDate ?? undefined,
   value: voucher.value ?? undefined,
@@ -43,9 +50,20 @@ const toVoucherResponse = (voucher: any) => ({
   category: voucher.category ?? undefined,
 });
 
-router.get('/', asyncRoute(async (_req, res) => {
+const toVoucherDetailResponse = (voucher: any) => ({
+  ...toVoucherResponse(voucher),
+  code: voucher.code,
+});
+
+router.get('/', asyncRoute(async (req, res) => {
   await connectDb();
-  const vouchers = await Voucher.find().sort({ donatedAt: -1 }).limit(200);
+  const { limit, offset } = listSchema.parse(req.query);
+  const vouchers = await Voucher
+    .find({ isActive: true, isRedeemed: false })
+    .sort({ donatedAt: -1 })
+    .skip(offset)
+    .limit(limit)
+    .lean();
   ok(res, { vouchers: vouchers.map(toVoucherResponse) });
 }));
 
@@ -71,7 +89,7 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
     process.stderr.write(`Failed to create donation activity: ${error instanceof Error ? error.message : String(error)}\n`);
   });
 
-  ok(res, { voucher: toVoucherResponse(voucher) }, 201);
+  ok(res, { voucher: toVoucherDetailResponse(voucher) }, 201);
 }));
 
 router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
@@ -94,7 +112,7 @@ router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
   }
 
   await RedeemedVoucher.create({ userId, voucherId }).catch(() => undefined);
-  ok(res, { voucher: toVoucherResponse(voucher), message: 'Voucher redeemed successfully' });
+  ok(res, { voucher: toVoucherDetailResponse(voucher), message: 'Voucher redeemed successfully' });
 }));
 
 router.post('/:id/report', requireAuth, asyncRoute(async (req, res) => {
@@ -127,7 +145,11 @@ router.post('/:id/report', requireAuth, asyncRoute(async (req, res) => {
 
 router.get('/:id/comments', asyncRoute(async (req, res) => {
   await connectDb();
-  const comments = await Comment.find({ voucherId: req.params.id }).sort({ createdAt: 1 });
+  const voucherId = req.params.id;
+  if (!mongoose.isValidObjectId(voucherId)) {
+    throw new ApiError(400, 'Invalid voucher id');
+  }
+  const comments = await Comment.find({ voucherId }).sort({ createdAt: 1 }).limit(100);
   const users = await User.find({ _id: { $in: comments.map((comment: any) => comment.userId) } });
   const names = new Map(users.map((user: any) => [user._id.toString(), user.username]));
 
@@ -145,20 +167,24 @@ router.get('/:id/comments', asyncRoute(async (req, res) => {
 
 router.post('/:id/comments', requireAuth, asyncRoute(async (req, res) => {
   await connectDb();
+  const voucherId = req.params.id;
+  if (!mongoose.isValidObjectId(voucherId)) {
+    throw new ApiError(400, 'Invalid voucher id');
+  }
   const input = z.object({ text: z.string().min(1).max(1000) }).parse(req.body);
   const userId = (req as AuthedRequest).userId;
-  const voucher = await Voucher.findById(req.params.id);
+  const voucher = await Voucher.findById(voucherId);
   if (!voucher) {
     throw new ApiError(404, 'Voucher not found');
   }
 
-  const comment = await Comment.create({ voucherId: req.params.id, userId, text: input.text.trim() });
+  const comment = await Comment.create({ voucherId, userId, text: input.text.trim() });
   const user = await User.findById(userId);
 
   ok(res, {
     comment: {
       id: comment._id.toString(),
-      voucherId: req.params.id,
+      voucherId,
       userId,
       username: user?.username ?? 'Anonymous',
       text: comment.text,

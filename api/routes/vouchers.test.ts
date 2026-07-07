@@ -8,38 +8,62 @@ const comments: any[] = [];
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
 vi.mock('../models/Activity', () => ({ Activity: { create: vi.fn(async () => ({})) } }));
-vi.mock('../models/Voucher', () => ({
-  Voucher: {
-    find: vi.fn(() => ({ sort: () => ({ limit: async () => vouchers }) })),
-    create: vi.fn(async (doc: any) => {
-      const voucher = {
-        _id: { toString: () => '507f1f77bcf86cd799439012' },
-        ...doc,
-        donatedAt: new Date('2026-05-20T00:00:00.000Z'),
-        isRedeemed: false,
-        reportCount: 0,
-        isActive: true,
-      };
-      vouchers.push(voucher);
-      return voucher;
-    }),
-    findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
-  },
-}));
-vi.mock('../models/Comment', () => ({
-  Comment: {
-    find: vi.fn(() => ({ sort: async () => comments })),
-    create: vi.fn(async (doc: any) => {
-      const comment = {
-        _id: { toString: () => '507f1f77bcf86cd799439030' },
-        ...doc,
-        createdAt: new Date('2026-05-20T00:00:00.000Z'),
-      };
-      comments.push(comment);
-      return comment;
-    }),
-  },
-}));
+vi.mock('../models/Voucher', () => {
+  const chain = {
+    sort: () => chain,
+    skip: () => chain,
+    limit: () => chain,
+    lean: async () => vouchers,
+  };
+  return {
+    Voucher: {
+      find: vi.fn(() => chain),
+      create: vi.fn(async (doc: any) => {
+        const voucher = {
+          _id: { toString: () => '507f1f77bcf86cd799439012' },
+          ...doc,
+          donatedAt: new Date('2026-05-20T00:00:00.000Z'),
+          isRedeemed: false,
+          reportCount: 0,
+          isActive: true,
+        };
+        vouchers.push(voucher);
+        return voucher;
+      }),
+      findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
+      findOneAndUpdate: vi.fn(async (_filter: any, update: any) => {
+        const voucher = vouchers.find((voucher) => voucher._id.toString() === '507f1f77bcf86cd799439012');
+        if (voucher) Object.assign(voucher, update);
+        return voucher ?? null;
+      }),
+      findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
+        const voucher = vouchers.find((voucher) => voucher._id.toString() === id);
+        if (voucher) Object.assign(voucher, update);
+        return voucher ?? null;
+      }),
+    },
+  };
+});
+vi.mock('../models/Comment', () => {
+  const chain = {
+    sort: () => chain,
+    limit: async () => comments,
+  };
+  return {
+    Comment: {
+      find: vi.fn(() => chain),
+      create: vi.fn(async (doc: any) => {
+        const comment = {
+          _id: { toString: () => '507f1f77bcf86cd799439030' },
+          ...doc,
+          createdAt: new Date('2026-05-20T00:00:00.000Z'),
+        };
+        comments.push(comment);
+        return comment;
+      }),
+    },
+  };
+});
 vi.mock('../models/User', () => ({
   User: {
     find: vi.fn(async () => []),
@@ -74,6 +98,37 @@ describe('voucher routes', () => {
 
     expect(res.body.data.voucher.title).toBe('Save 10');
     expect(res.body.data.voucher.donatedBy).toBe('507f1f77bcf86cd799439011');
+    expect(res.body.data.voucher.code).toBe('SAVE10');
+  });
+
+  it('does not leak voucher codes in the public list', async () => {
+    const token = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+    await request(createApp())
+      .post('/api/vouchers')
+      .set('Cookie', [`auth_token=${token}`])
+      .send({
+        platform: 'Google Pay',
+        title: 'Save 10',
+        description: 'Ten off',
+        code: 'SECRET-CODE',
+        imageUrl: 'https://res.cloudinary.com/test/x.png',
+        category: 'Shopping',
+      })
+      .expect(201);
+
+    const res = await request(createApp()).get('/api/vouchers').expect(200);
+
+    expect(res.body.data.vouchers).toHaveLength(1);
+    expect(res.body.data.vouchers[0].code).toBeUndefined();
+    expect(res.body.data.vouchers[0].title).toBe('Save 10');
+  });
+
+  it('returns 400 for invalid voucher id on comments', async () => {
+    const res = await request(createApp())
+      .get('/api/vouchers/not-an-id/comments')
+      .expect(400);
+
+    expect(res.body.error.message).toBe('Invalid voucher id');
   });
 
   it('rejects comments for nonexistent vouchers', async () => {
