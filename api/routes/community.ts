@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
-import { asyncRoute, ok } from '../lib/http.js';
+import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
 import { Notification } from '../models/Notification.js';
@@ -10,6 +11,12 @@ import { Voucher } from '../models/Voucher.js';
 import { VoucherRequest } from '../models/VoucherRequest.js';
 
 const router = Router();
+
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  unreadOnly: z.coerce.boolean().optional().default(false),
+});
 
 const toRequestResponse = (request: any, username = 'Anonymous') => ({
   id: request._id.toString(),
@@ -45,9 +52,14 @@ const toActivityResponse = (activity: any) => ({
   createdAt: activity.createdAt,
 });
 
-router.get('/requests', asyncRoute(async (_req, res) => {
+router.get('/requests', asyncRoute(async (req, res) => {
   await connectDb();
-  const requests = await VoucherRequest.find().sort({ createdAt: -1 });
+  const { limit, offset } = listQuerySchema.parse(req.query);
+  const requests = await VoucherRequest
+    .find()
+    .sort({ createdAt: -1 })
+    .skip(offset)
+    .limit(limit);
   const users = await User.find({ _id: { $in: requests.map((request: any) => request.userId) } });
   const names = new Map<string, string>(users.map((user: any) => [user._id.toString(), user.username]));
 
@@ -62,7 +74,7 @@ router.post('/requests', requireAuth, asyncRoute(async (req, res) => {
     title: z.string().min(1).max(120),
     description: z.string().min(1).max(1000),
     category: z.string().min(1),
-  }).parse(req.body);
+  }).strict().parse(req.body);
 
   const requestDoc = await VoucherRequest.create({ ...input, userId: (req as AuthedRequest).userId });
   ok(res, { request: toRequestResponse(requestDoc) }, 201);
@@ -70,23 +82,38 @@ router.post('/requests', requireAuth, asyncRoute(async (req, res) => {
 
 router.get('/notifications', requireAuth, asyncRoute(async (req, res) => {
   await connectDb();
-  const notifications = await Notification.find({ userId: (req as AuthedRequest).userId }).sort({ createdAt: -1 });
+  const { limit, offset, unreadOnly } = listQuerySchema.parse(req.query);
+  const filter: Record<string, unknown> = { userId: (req as AuthedRequest).userId };
+  if (unreadOnly) filter.isRead = false;
+  const notifications = await Notification
+    .find(filter)
+    .sort({ createdAt: -1 })
+    .skip(offset)
+    .limit(limit);
   ok(res, { notifications: notifications.map(toNotificationResponse) });
 }));
 
 router.patch('/notifications/:id/read', requireAuth, asyncRoute(async (req, res) => {
   await connectDb();
+  const notificationId = req.params.id;
+  if (!mongoose.isValidObjectId(notificationId)) {
+    throw new ApiError(400, 'Invalid notification id');
+  }
   const notification = await Notification.findOneAndUpdate(
-    { _id: req.params.id, userId: (req as AuthedRequest).userId },
+    { _id: notificationId, userId: (req as AuthedRequest).userId },
     { isRead: true },
     { new: true }
   );
-  ok(res, { notification: notification ? toNotificationResponse(notification) : null });
+  if (!notification) {
+    throw new ApiError(404, 'Notification not found');
+  }
+  ok(res, { notification: toNotificationResponse(notification) });
 }));
 
 router.get('/leaderboard', asyncRoute(async (_req, res) => {
   await connectDb();
   const rows = await Voucher.aggregate([
+    { $match: { isActive: true, isRedeemed: false } },
     { $group: { _id: '$donatedBy', donationCount: { $sum: 1 }, totalDonated: { $sum: 1 } } },
     { $sort: { donationCount: -1 } },
     { $limit: 10 },
@@ -108,9 +135,14 @@ router.get('/leaderboard', asyncRoute(async (_req, res) => {
   });
 }));
 
-router.get('/activities', asyncRoute(async (_req, res) => {
+router.get('/activities', asyncRoute(async (req, res) => {
   await connectDb();
-  const activities = await Activity.find().sort({ createdAt: -1 }).limit(50);
+  const { limit, offset } = listQuerySchema.parse(req.query);
+  const activities = await Activity
+    .find()
+    .sort({ createdAt: -1 })
+    .skip(offset)
+    .limit(limit);
   ok(res, { activities: activities.map(toActivityResponse) });
 }));
 
