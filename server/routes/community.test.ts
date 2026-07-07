@@ -2,8 +2,10 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { signAuthToken } from '../lib/token';
+import { User } from '../models/User';
 
 const requests: any[] = [];
+const activities: any[] = [];
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
 vi.mock('../models/VoucherRequest', () => {
@@ -60,7 +62,7 @@ vi.mock('../models/Activity', () => {
   const chain = {
     sort: () => chain,
     skip: () => chain,
-    limit: async () => [],
+    limit: async () => activities,
   };
   return { Activity: { find: vi.fn(() => chain) } };
 });
@@ -70,6 +72,9 @@ describe('community routes', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret';
     requests.length = 0;
+    activities.length = 0;
+    vi.mocked(User.find).mockReset();
+    vi.mocked(User.find).mockResolvedValue([] as any);
   });
 
   it('lists voucher requests', async () => {
@@ -129,5 +134,43 @@ describe('community routes', () => {
       .expect(404);
 
     expect(res.body.error.message).toBe('Notification not found');
+  });
+
+  it('includes the activity author username in the activity response', async () => {
+    vi.mocked(User.find).mockResolvedValueOnce([
+      { _id: { toString: () => '507f1f77bcf86cd799439011' }, username: 'alice' },
+    ] as any);
+    activities.push({
+      _id: { toString: () => '507f1f77bcf86cd799439030' },
+      userId: { toString: () => '507f1f77bcf86cd799439011' },
+      activityType: 'donation',
+      entityId: { toString: () => '507f1f77bcf86cd799439012' },
+      entityType: 'voucher',
+      title: 'Voucher donated',
+      description: 'Save 10',
+      createdAt: new Date('2026-05-20T00:00:00.000Z'),
+    });
+
+    const res = await request(createApp()).get('/api/activities').expect(200);
+
+    expect(res.body.data.activities).toHaveLength(1);
+    expect(res.body.data.activities[0].username).toBe('alice');
+  });
+
+  it('falls back to "Anonymous" when the activity author user is missing', async () => {
+    activities.push({
+      _id: { toString: () => '507f1f77bcf86cd799439030' },
+      userId: { toString: () => '507f1f77bcf86cd799439011' },
+      activityType: 'donation',
+      entityId: { toString: () => '507f1f77bcf86cd799439012' },
+      entityType: 'voucher',
+      title: 'Voucher donated',
+      description: 'Save 10',
+      createdAt: new Date('2026-05-20T00:00:00.000Z'),
+    });
+
+    const res = await request(createApp()).get('/api/activities').expect(200);
+
+    expect(res.body.data.activities[0].username).toBe('Anonymous');
   });
 });

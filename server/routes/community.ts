@@ -41,9 +41,10 @@ const toNotificationResponse = (notification: any) => ({
   createdAt: notification.createdAt,
 });
 
-const toActivityResponse = (activity: any) => ({
+const toActivityResponse = (activity: any, username = 'Anonymous') => ({
   id: activity._id.toString(),
   userId: activity.userId.toString(),
+  username,
   activityType: activity.activityType,
   entityId: activity.entityId.toString(),
   entityType: activity.entityType,
@@ -143,7 +144,11 @@ router.get('/activities', asyncRoute(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(offset)
     .limit(limit);
-  ok(res, { activities: activities.map(toActivityResponse) });
+  const users = await User.find({ _id: { $in: activities.map((activity: any) => activity.userId) } });
+  const names = new Map<string, string>(users.map((user: any) => [user._id.toString(), user.username]));
+  ok(res, {
+    activities: activities.map((activity: any) => toActivityResponse(activity, names.get(activity.userId.toString()))),
+  });
 }));
 
 export { router as communityRouter };

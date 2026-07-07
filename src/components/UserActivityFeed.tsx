@@ -100,8 +100,8 @@ function ActivityCard({ activity }: { activity: UserActivity }) {
               <div className="font-medium">{activity.title}</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Avatar className="h-5 w-5">
-                  <AvatarFallback>{activity.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-                  <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${activity.username}`} />
+                  <AvatarFallback>{(activity.username ?? 'Anonymous').substring(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${activity.username ?? 'Anonymous'}`} />
                 </Avatar>
                 <span>{activity.username}</span>
                 <span>•</span>

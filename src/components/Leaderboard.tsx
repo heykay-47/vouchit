@@ -81,8 +81,8 @@ export default function Leaderboard({ limit = 10 }: LeaderboardProps) {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback>{contributor.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contributor.username}`} />
+                        <AvatarFallback>{(contributor.username ?? 'Anonymous').substring(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contributor.username ?? 'Anonymous'}`} />
                       </Avatar>
                       <span>{contributor.username}</span>
                     </div>
