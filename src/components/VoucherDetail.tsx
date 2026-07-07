@@ -202,8 +202,8 @@ export default function VoucherDetail({ voucher, onRedeem, onReport }: VoucherDe
       </CardContent>
       
       <CardFooter className="flex justify-between">
-        {!voucher.isRedeemed && user && (
-          <Button 
+        {!voucher.isRedeemed && user && user.id !== voucher.donatedBy && (
+          <Button
             onClick={onRedeem}
             disabled={!onRedeem || voucher.isRedeemed}
           >

@@ -31,10 +31,16 @@ vi.mock('../models/Voucher', () => {
         return voucher;
       }),
       findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
-      findOneAndUpdate: vi.fn(async (_filter: any, update: any) => {
+      findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
         const voucher = vouchers.find((voucher) => voucher._id.toString() === '507f1f77bcf86cd799439012');
-        if (voucher) Object.assign(voucher, update);
-        return voucher ?? null;
+        if (!voucher) return null;
+        if (filter.isActive !== undefined && filter.isActive !== voucher.isActive) return null;
+        if (filter.isRedeemed !== undefined && filter.isRedeemed !== voucher.isRedeemed) return null;
+        if (filter.donatedBy && typeof filter.donatedBy === 'object' && filter.donatedBy.$ne !== undefined) {
+          if (voucher.donatedBy && voucher.donatedBy.toString() === filter.donatedBy.$ne.toString()) return null;
+        }
+        Object.assign(voucher, update);
+        return voucher;
       }),
       findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
         const voucher = vouchers.find((voucher) => voucher._id.toString() === id);
@@ -191,6 +197,30 @@ describe('voucher routes', () => {
 
     expect(res.body.data.vouchers).toHaveLength(1);
     expect(res.body.data.vouchers[0].code).toBeUndefined();
+  });
+
+  it('rejects a donor from redeeming their own voucher', async () => {
+    const donorToken = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+    await request(createApp())
+      .post('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .send({
+        platform: 'Google Pay',
+        title: 'Self-redeem',
+        description: 'Should not be redeemable by donor',
+        code: 'OWN-CODE',
+        imageUrl: 'https://res.cloudinary.com/test/x.png',
+        category: 'Shopping',
+      })
+      .expect(201);
+
+    const res = await request(createApp())
+      .post('/api/vouchers/507f1f77bcf86cd799439012/redeem')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .expect(409);
+
+    expect(res.body.error.message).toBe('Voucher is not available');
+    expect(vouchers[0].isRedeemed).toBe(false);
   });
 
   it('includes voucher code in the list for the redeemer after redeem', async () => {

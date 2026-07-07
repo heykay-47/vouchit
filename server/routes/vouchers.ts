@@ -104,7 +104,7 @@ router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
   }
 
   const voucher = await Voucher.findOneAndUpdate(
-    { _id: voucherId, isActive: true, isRedeemed: false },
+    { _id: voucherId, isActive: true, isRedeemed: false, donatedBy: { $ne: userId } },
     { isRedeemed: true, redeemedBy: userId, redeemedAt: new Date() },
     { new: true }
   );

@@ -22,7 +22,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   const { redeemVoucher, reportVoucher } = useVouchers();
   
   const hasExpired = voucher.expiryDate ? new Date(voucher.expiryDate) < new Date() : false;
-  const isRedeemable = !voucher.isRedeemed && voucher.isActive && !hasExpired;
+  const isRedeemable = !voucher.isRedeemed && voucher.isActive && !hasExpired && user?.id !== voucher.donatedBy;
   const isOwnRedeemedVoucher = user?.id === voucher.redeemedBy;
   
   const getDaysUntilExpiry = () => {
