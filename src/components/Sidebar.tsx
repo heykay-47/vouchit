@@ -115,9 +115,7 @@ export default function Sidebar() {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
           <Link to="/" className="flex items-center gap-2" onClick={() => setIsMobileOpen(false)}>
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="font-bold text-primary-foreground text-sm">VI</span>
-            </div>
+            <img src="/logo/vouchitLogo.png" alt="VouchIt" className="w-8 h-8 rounded-lg" />
             <span className="font-medium text-sm lowercase">vouchit</span>
           </Link>
           
