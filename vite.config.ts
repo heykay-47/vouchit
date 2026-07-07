@@ -38,6 +38,11 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
+            if (id.includes('recharts')) return 'recharts';
+            if (id.includes('framer-motion')) return 'framer-motion';
+            if (id.includes('@radix-ui') || id.includes('@radix')) return 'radix';
+            if (id.includes('react-router')) return 'router';
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) return 'react';
             return 'vendor';
           }
         },
