@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
-import { hashPassword, verifyPassword } from '../lib/password.js';
+import { hashPassword } from '../lib/password.js';
 import { clearAuthCookie, createAuthCookie, signAuthToken } from '../lib/token.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { toUserResponse } from '../lib/serializers.js';
@@ -13,15 +14,19 @@ const router = Router();
 const signupSchema = z.object({
   email: z.string().email().transform((value) => value.toLowerCase().trim()),
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/),
-  password: z.string().min(6),
+  password: z.string().min(8).max(72),
   rememberMe: z.boolean().optional().default(false),
-});
+}).strict();
 
 const loginSchema = z.object({
   email: z.string().email().transform((value) => value.toLowerCase().trim()),
   password: z.string().min(1),
   rememberMe: z.boolean().optional().default(false),
-});
+}).strict();
+
+// Constant-time-ish login: always run bcrypt even when user is missing so the
+// response time does not reveal whether an email is registered.
+const DUMMY_HASH = '$2a$12$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
 
 router.post('/signup', asyncRoute(async (req, res) => {
   await connectDb();
@@ -32,13 +37,21 @@ router.post('/signup', asyncRoute(async (req, res) => {
     throw new ApiError(409, 'An account with this email already exists');
   }
 
-  const user = await User.create({
-    email: input.email,
-    username: input.username,
-    passwordHash: await hashPassword(input.password),
-  });
+  let user;
+  try {
+    user = await User.create({
+      email: input.email,
+      username: input.username,
+      passwordHash: await hashPassword(input.password),
+    });
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) {
+      throw new ApiError(409, 'An account with this email already exists');
+    }
+    throw error;
+  }
 
-  const token = signAuthToken({ userId: user._id.toString() }, input.rememberMe ? '30d' : '12h');
+  const token = signAuthToken({ userId: user._id.toString() }, input.rememberMe ? '7d' : '12h');
   res.setHeader('Set-Cookie', createAuthCookie(token, input.rememberMe));
   ok(res, { user: await toUserResponse(user) }, 201);
 }));
@@ -48,11 +61,14 @@ router.post('/login', asyncRoute(async (req, res) => {
   const input = loginSchema.parse(req.body);
   const user = await User.findOne({ email: input.email });
 
-  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+  const hashToVerify = user?.passwordHash ?? DUMMY_HASH;
+  const valid = await bcrypt.compare(input.password, hashToVerify);
+
+  if (!user || !valid) {
     throw new ApiError(401, 'Invalid email or password');
   }
 
-  const token = signAuthToken({ userId: user._id.toString() }, input.rememberMe ? '30d' : '12h');
+  const token = signAuthToken({ userId: user._id.toString() }, input.rememberMe ? '7d' : '12h');
   res.setHeader('Set-Cookie', createAuthCookie(token, input.rememberMe));
   ok(res, { user: await toUserResponse(user) });
 }));

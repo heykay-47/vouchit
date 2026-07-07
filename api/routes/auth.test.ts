@@ -26,8 +26,7 @@ vi.mock('../models/User', () => ({
       return user;
     }),
   },
-}));
-vi.mock('../models/Favorite', () => ({
+}));vi.mock('../models/Favorite', () => ({
   Favorite: {
     find: vi.fn(async (query: any) => favorites.filter((favorite) => favorite.userId === query.userId)),
   },
@@ -49,7 +48,7 @@ describe('auth routes', () => {
   it('signs up and returns current user', async () => {
     const res = await request(createApp())
       .post('/api/auth/signup')
-      .send({ email: 'student@example.com', username: 'student', password: 'secret1', rememberMe: true })
+      .send({ email: 'student@example.com', username: 'student', password: 'secret123', rememberMe: true })
       .expect(201);
 
     expect(res.body.data.user.email).toBe('student@example.com');
@@ -59,20 +58,42 @@ describe('auth routes', () => {
   it('rejects duplicate email', async () => {
     await request(createApp())
       .post('/api/auth/signup')
-      .send({ email: 'student@example.com', username: 'student', password: 'secret1' });
+      .send({ email: 'student@example.com', username: 'student', password: 'secret123' });
 
     const res = await request(createApp())
       .post('/api/auth/signup')
-      .send({ email: 'student@example.com', username: 'other', password: 'secret1' })
+      .send({ email: 'student@example.com', username: 'other', password: 'secret123' })
       .expect(409);
 
     expect(res.body.error.message).toBe('An account with this email already exists');
   });
 
+  it('rejects signup with password shorter than 8 chars', async () => {
+    const res = await request(createApp())
+      .post('/api/auth/signup')
+      .send({ email: 'short@example.com', username: 'short', password: 'short1' })
+      .expect(400);
+
+    expect(res.body.error).toBeTruthy();
+  });
+
+  it('login with unregistered email returns 401 (timing-safe)', async () => {
+    const start = Date.now();
+    const res = await request(createApp())
+      .post('/api/auth/login')
+      .send({ email: 'nobody@example.com', password: 'whatever123' })
+      .expect(401);
+    const elapsed = Date.now() - start;
+
+    expect(res.body.error.message).toBe('Invalid email or password');
+    // bcrypt ran (dummy hash) — should take a measurable amount of time.
+    expect(elapsed).toBeGreaterThanOrEqual(20);
+  });
+
   it('returns favorite and redeemed voucher ids for current user', async () => {
     const signup = await request(createApp())
       .post('/api/auth/signup')
-      .send({ email: 'student@example.com', username: 'student', password: 'secret1', rememberMe: true })
+      .send({ email: 'student@example.com', username: 'student', password: 'secret123', rememberMe: true })
       .expect(201);
 
     favorites.push({

@@ -18,7 +18,7 @@ export const signAuthToken = (payload: AuthTokenPayload, expiresIn: SignOptions[
 };
 
 export const verifyAuthToken = (token: string): AuthTokenPayload => {
-  const decoded = jwt.verify(token, getJwtSecret());
+  const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] });
   if (typeof decoded === 'string' || !decoded.userId) {
     throw new Error('Invalid auth token');
   }
@@ -28,10 +28,10 @@ export const verifyAuthToken = (token: string): AuthTokenPayload => {
 export const createAuthCookie = (token: string, rememberMe: boolean) => {
   const options = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? ('strict' as const) : ('lax' as const),
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+    ...(rememberMe ? { maxAge: 60 * 60 * 24 * 7 } : {}),
   } as const;
 
   return serialize('auth_token', token, options);
@@ -40,7 +40,7 @@ export const createAuthCookie = (token: string, rememberMe: boolean) => {
 export const clearAuthCookie = () => {
   return serialize('auth_token', '', {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? ('strict' as const) : ('lax' as const),
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 0,
