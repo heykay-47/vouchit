@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app';
 import { signAuthToken } from '../lib/token';
+import { Voucher } from '../models/Voucher';
 
 const vouchers: any[] = [];
 const comments: any[] = [];
@@ -84,6 +85,7 @@ describe('voucher routes', () => {
     process.env.JWT_SECRET = 'test-secret';
     vouchers.length = 0;
     comments.length = 0;
+    Voucher.find.mockClear();
   });
 
   it('creates a voucher for an authenticated user', async () => {
@@ -263,5 +265,16 @@ describe('voucher routes', () => {
       .set('Cookie', [`auth_token=${bystanderToken}`])
       .expect(200);
     expect(bystanderRes.body.data.vouchers[0].code).toBeUndefined();
+  });
+
+  it('queries vouchers visible to the authenticated viewer', async () => {
+    const token = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+
+    await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${token}`])
+      .expect(200);
+
+    expect(Voucher.find).toHaveBeenCalledWith(expect.objectContaining({ $or: expect.any(Array) }));
   });
 });

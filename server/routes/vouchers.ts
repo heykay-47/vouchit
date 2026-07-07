@@ -60,8 +60,17 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   await connectDb();
   const { limit, offset } = listSchema.parse(req.query);
   const viewerId = getOptionalUserId(req);
+  const query = viewerId
+    ? {
+        $or: [
+          { isActive: true, isRedeemed: false },
+          { donatedBy: viewerId },
+          { redeemedBy: viewerId },
+        ],
+      }
+    : { isActive: true, isRedeemed: false };
   const vouchers = await Voucher
-    .find({ isActive: true, isRedeemed: false })
+    .find(query)
     .sort({ donatedAt: -1 })
     .skip(offset)
     .limit(limit)

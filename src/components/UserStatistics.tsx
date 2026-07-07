@@ -41,9 +41,7 @@ export default function UserStatistics({ user, donatedCount, redeemedCount }: Us
   const { vouchers } = useVouchers();
   
   // Validate voucher data
-  const isVoucherDataValid = vouchers && Array.isArray(vouchers) && vouchers.length > 0;
-  
-  if (!isVoucherDataValid) {
+  if (!Array.isArray(vouchers)) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
