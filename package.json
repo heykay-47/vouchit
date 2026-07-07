@@ -1,19 +1,19 @@
 {
-  "name": "voucherswap",
+  "name": "vouchit",
   "private": true,
   "version": "1.0.0",
   "description": "Share and exchange vouchers with your community. Find great deals and help others save money.",
   "type": "module",
-  "author": "VoucherSwap Team",
+  "author": "VouchIt Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/heykay-47/voucherswap.git"
+    "url": "https://github.com/heykay-47/vouchit.git"
   },
   "bugs": {
-    "url": "https://github.com/heykay-47/voucherswap/issues"
+    "url": "https://github.com/heykay-47/vouchit/issues"
   },
-  "homepage": "https://voucherswap.vercel.app/",
+  "homepage": "https://vouchit.vercel.app/",
   "keywords": [
     "vouchers",
     "deals",
@@ -71,7 +71,9 @@
     "dompurify": "^3.2.6",
     "embla-carousel-react": "^8.3.0",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.5.2",
     "framer-motion": "^12.5.0",
+    "helmet": "^8.2.0",
     "input-otp": "^1.2.4",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.462.0",
