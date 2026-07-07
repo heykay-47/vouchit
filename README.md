@@ -18,7 +18,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The API runs as Vercel serverless functions — in local dev it only works when deployed or tested via `npx tsx api/app.ts`. Frontend starts at `http://localhost:5173`.
+The API runs as Vercel serverless functions — in local dev it only works when deployed or tested via `npx tsx server/app.ts`. Frontend starts at `http://localhost:5173`.
 
 ### Environment Variables
 

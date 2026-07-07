@@ -1,9 +1,7 @@
 {
   "functions": {
     "api/[...path].ts": {
-      "memory": 1024,
-      "maxDuration": 10,
-      "excludeFiles": "api/**/*.test.ts"
+      "maxDuration": 10
     }
   },
   "headers": [
