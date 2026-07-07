@@ -88,6 +88,10 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   };
   
   const copyCode = () => {
+    if (!voucher.code) {
+      toast.error('code not available');
+      return;
+    }
     navigator.clipboard.writeText(voucher.code);
     toast.success('code copied');
   };
@@ -177,8 +181,8 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground lowercase">code</span>
-                {isAuthenticated ? (
-                  <button 
+                {voucher.code ? (
+                  <button
                     onClick={copyCode}
                     className="font-mono text-xs bg-muted px-2 py-1 rounded hover:bg-muted/80 flex items-center gap-1"
                   >

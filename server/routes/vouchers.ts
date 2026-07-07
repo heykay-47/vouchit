@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
-import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { getOptionalUserId, optionalAuth, requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
 import { Comment } from '../models/Comment.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
@@ -32,39 +32,41 @@ const listSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-const toVoucherResponse = (voucher: any) => ({
-  id: voucher._id.toString(),
-  platform: voucher.platform,
-  title: voucher.title,
-  description: voucher.description,
-  imageUrl: voucher.imageUrl,
-  expiryDate: voucher.expiryDate ?? undefined,
-  value: voucher.value ?? undefined,
-  donatedBy: voucher.donatedBy?.toString?.() ?? String(voucher.donatedBy),
-  donatedAt: voucher.donatedAt,
-  isRedeemed: voucher.isRedeemed,
-  redeemedBy: voucher.redeemedBy?.toString?.() ?? undefined,
-  redeemedAt: voucher.redeemedAt ?? undefined,
-  reportCount: voucher.reportCount,
-  isActive: voucher.isActive,
-  category: voucher.category ?? undefined,
-});
+const toVoucherResponse = (voucher: any, viewerId?: string) => {
+  const donatedBy = voucher.donatedBy?.toString?.() ?? String(voucher.donatedBy);
+  const redeemedBy = voucher.redeemedBy?.toString?.() ?? undefined;
+  const canViewCode = !!viewerId && (donatedBy === viewerId || redeemedBy === viewerId);
+  return {
+    id: voucher._id.toString(),
+    platform: voucher.platform,
+    title: voucher.title,
+    description: voucher.description,
+    ...(canViewCode ? { code: voucher.code } : {}),
+    imageUrl: voucher.imageUrl,
+    expiryDate: voucher.expiryDate ?? undefined,
+    value: voucher.value ?? undefined,
+    donatedBy,
+    donatedAt: voucher.donatedAt,
+    isRedeemed: voucher.isRedeemed,
+    redeemedBy,
+    redeemedAt: voucher.redeemedAt ?? undefined,
+    reportCount: voucher.reportCount,
+    isActive: voucher.isActive,
+    category: voucher.category ?? undefined,
+  };
+};
 
-const toVoucherDetailResponse = (voucher: any) => ({
-  ...toVoucherResponse(voucher),
-  code: voucher.code,
-});
-
-router.get('/', asyncRoute(async (req, res) => {
+router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   await connectDb();
   const { limit, offset } = listSchema.parse(req.query);
+  const viewerId = getOptionalUserId(req);
   const vouchers = await Voucher
     .find({ isActive: true, isRedeemed: false })
     .sort({ donatedAt: -1 })
     .skip(offset)
     .limit(limit)
     .lean();
-  ok(res, { vouchers: vouchers.map(toVoucherResponse) });
+  ok(res, { vouchers: vouchers.map((voucher) => toVoucherResponse(voucher, viewerId)) });
 }));
 
 router.post('/', requireAuth, asyncRoute(async (req, res) => {
@@ -89,7 +91,7 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
     process.stderr.write(`Failed to create donation activity: ${error instanceof Error ? error.message : String(error)}\n`);
   });
 
-  ok(res, { voucher: toVoucherDetailResponse(voucher) }, 201);
+  ok(res, { voucher: toVoucherResponse(voucher, userId) }, 201);
 }));
 
 router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
@@ -112,7 +114,7 @@ router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
   }
 
   await RedeemedVoucher.create({ userId, voucherId }).catch(() => undefined);
-  ok(res, { voucher: toVoucherDetailResponse(voucher), message: 'Voucher redeemed successfully' });
+  ok(res, { voucher: toVoucherResponse(voucher, userId), message: 'Voucher redeemed successfully' });
 }));
 
 router.post('/:id/report', requireAuth, asyncRoute(async (req, res) => {
@@ -140,7 +142,7 @@ router.post('/:id/report', requireAuth, asyncRoute(async (req, res) => {
     throw new ApiError(404, 'Voucher not found');
   }
 
-  ok(res, { voucher: toVoucherResponse(voucher), message: 'Voucher reported as not working' });
+  ok(res, { voucher: toVoucherResponse(voucher, userId), message: 'Voucher reported as not working' });
 }));
 
 router.get('/:id/comments', asyncRoute(async (req, res) => {

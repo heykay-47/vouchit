@@ -143,4 +143,95 @@ describe('voucher routes', () => {
     expect(res.body.error.message).toBe('Voucher not found');
     expect(comments).toHaveLength(0);
   });
+
+  it('includes voucher code in the list for the donor', async () => {
+    const donorToken = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+    await request(createApp())
+      .post('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .send({
+        platform: 'Google Pay',
+        title: 'Save 10',
+        description: 'Ten off',
+        code: 'DONOR-CODE',
+        imageUrl: 'https://res.cloudinary.com/test/x.png',
+        category: 'Shopping',
+      })
+      .expect(201);
+
+    const res = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .expect(200);
+
+    expect(res.body.data.vouchers).toHaveLength(1);
+    expect(res.body.data.vouchers[0].code).toBe('DONOR-CODE');
+  });
+
+  it('omits voucher code in the list for other authenticated users', async () => {
+    const donorToken = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+    const otherToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
+    await request(createApp())
+      .post('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .send({
+        platform: 'Google Pay',
+        title: 'Save 10',
+        description: 'Ten off',
+        code: 'DONOR-CODE',
+        imageUrl: 'https://res.cloudinary.com/test/x.png',
+        category: 'Shopping',
+      })
+      .expect(201);
+
+    const res = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${otherToken}`])
+      .expect(200);
+
+    expect(res.body.data.vouchers).toHaveLength(1);
+    expect(res.body.data.vouchers[0].code).toBeUndefined();
+  });
+
+  it('includes voucher code in the list for the redeemer after redeem', async () => {
+    const donorToken = signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '1h');
+    const redeemerToken = signAuthToken({ userId: '507f1f77bcf86cd799439022' }, '1h');
+    const bystanderToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
+
+    await request(createApp())
+      .post('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .send({
+        platform: 'Google Pay',
+        title: 'Save 10',
+        description: 'Ten off',
+        code: 'REDEEM-CODE',
+        imageUrl: 'https://res.cloudinary.com/test/x.png',
+        category: 'Shopping',
+      })
+      .expect(201);
+
+    await request(createApp())
+      .post('/api/vouchers/507f1f77bcf86cd799439012/redeem')
+      .set('Cookie', [`auth_token=${redeemerToken}`])
+      .expect(200);
+
+    const redeemerRes = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${redeemerToken}`])
+      .expect(200);
+    expect(redeemerRes.body.data.vouchers[0].code).toBe('REDEEM-CODE');
+
+    const donorRes = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${donorToken}`])
+      .expect(200);
+    expect(donorRes.body.data.vouchers[0].code).toBe('REDEEM-CODE');
+
+    const bystanderRes = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${bystanderToken}`])
+      .expect(200);
+    expect(bystanderRes.body.data.vouchers[0].code).toBeUndefined();
+  });
 });

@@ -7,6 +7,10 @@ export type AuthedRequest = Request & {
   userId: string;
 };
 
+export type OptionallyAuthedRequest = Request & {
+  userId?: string;
+};
+
 export const requireAuth = (req: Request, _res: Response, next: NextFunction) => {
   const cookies = parse(req.headers.cookie ?? '');
   const token = cookies.auth_token;
@@ -23,4 +27,26 @@ export const requireAuth = (req: Request, _res: Response, next: NextFunction) =>
   } catch {
     next(new ApiError(401, 'Authentication required'));
   }
+};
+
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction) => {
+  const cookies = parse(req.headers.cookie ?? '');
+  const token = cookies.auth_token;
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    const payload = verifyAuthToken(token);
+    (req as OptionallyAuthedRequest).userId = payload.userId;
+  } catch {
+    // ignore invalid tokens for optional auth
+  }
+  next();
+};
+
+export const getOptionalUserId = (req: Request): string | undefined => {
+  return (req as OptionallyAuthedRequest).userId;
 };

@@ -28,10 +28,16 @@ export const useVoucherOperations = (setMutationError: (message: string | null) 
 
   const redeemMutation = useMutation({
     mutationFn: (voucherId: string) => voucherService.redeem(voucherId),
-    onSuccess: () => {
+    onSuccess: (response) => {
       toast.success('Voucher redeemed successfully');
       setMutationError(null);
-      queryClient.invalidateQueries({ queryKey: vouchersQueryKey });
+      const redeemed = response.voucher;
+      queryClient.setQueryData<Voucher[]>(vouchersQueryKey, (current) => {
+        if (!current) return current;
+        return current.map((voucher) => (
+          voucher.id === redeemed.id ? { ...voucher, ...redeemed } : voucher
+        ));
+      });
     },
     onError: (error: Error) => {
       voucherLogger.error('Error redeeming voucher', error);

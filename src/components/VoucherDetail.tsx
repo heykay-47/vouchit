@@ -38,6 +38,10 @@ export default function VoucherDetail({ voucher, onRedeem, onReport }: VoucherDe
   const [copied, setCopied] = useState(false);
   
   const copyCode = () => {
+    if (!voucher.code) {
+      toast.error('Code not available');
+      return;
+    }
     navigator.clipboard.writeText(voucher.code)
       .then(() => {
         toast.success('Voucher code copied to clipboard!');
@@ -114,27 +118,38 @@ export default function VoucherDetail({ voucher, onRedeem, onReport }: VoucherDe
         
         {/* Voucher Code - Only show to authenticated users */}
         {user ? (
-          <div className="p-3 border rounded-md bg-muted/30 flex justify-between items-center">
-            <div className="font-mono text-sm">{voucher.code}</div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={copyCode}
-              className="flex items-center gap-1"
-            >
-              {copied ? (
-                <>
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span className="text-green-500">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4" />
-                  <span>Copy</span>
-                </>
-              )}
-            </Button>
-          </div>
+          voucher.code ? (
+            <div className="p-3 border rounded-md bg-muted/30 flex justify-between items-center">
+              <div className="font-mono text-sm">{voucher.code}</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={copyCode}
+                className="flex items-center gap-1"
+              >
+                {copied ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-green-500">Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="p-4 border rounded-md bg-muted/30 text-center">
+              <p className="text-sm text-muted-foreground mb-2">
+                Redeem this voucher to view the code
+              </p>
+              <Badge variant="outline" className="font-mono">
+                ••••••••••••
+              </Badge>
+            </div>
+          )
         ) : (
           <div className="p-4 border rounded-md bg-muted/30 text-center">
             <p className="text-sm text-muted-foreground mb-2">
