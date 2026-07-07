@@ -14,17 +14,39 @@ export class ApiClientError extends Error {
 
 export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   const hasJsonBody = init.body !== undefined && !(init.body instanceof FormData);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
 
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'include',
-    headers: {
-      ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      credentials: 'include',
+      signal: controller.signal,
+      headers: {
+        ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new ApiClientError('Request timed out', 408);
+    }
+    throw new ApiClientError('Network error', 0);
+  }
+  clearTimeout(timeout);
 
-  const envelope = (await response.json()) as ApiEnvelope<T>;
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent('auth:401'));
+  }
+
+  let envelope: ApiEnvelope<T>;
+  try {
+    envelope = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiClientError(`Request failed (${response.status})`, response.status);
+  }
 
   if (!response.ok || envelope.error) {
     throw new ApiClientError(envelope.error?.message ?? 'Request failed', response.status);

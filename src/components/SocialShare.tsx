@@ -21,7 +21,7 @@ export default function SocialShare({ voucherId, voucherTitle }: SocialShareProp
   
   // Create the base URL for sharing
   const baseUrl = window.location.origin;
-  const shareUrl = `${baseUrl}/voucher/${voucherId}`;
+  const shareUrl = `${baseUrl}/browse`;
   const shareTitle = voucherTitle ? `Check out this voucher: ${voucherTitle}` : 'Check out this voucher';
   
   // Copies voucher share link to clipboard for easy distribution
@@ -51,7 +51,7 @@ export default function SocialShare({ voucherId, voucherTitle }: SocialShareProp
   
   // Open share dialog
   const openShareWindow = (url: string) => {
-    window.open(url, '_blank', 'width=600,height=400');
+    window.open(url, '_blank', 'width=600,height=400,noopener,noreferrer');
   };
 
   return (

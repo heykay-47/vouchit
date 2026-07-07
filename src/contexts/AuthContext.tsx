@@ -49,7 +49,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     init();
 
-    return () => { mountedRef.current = false; };
+    const handleAuth401 = () => {
+      if (mountedRef.current) {
+        setUser(null);
+        toast.error('Your session has expired. Please log in again.');
+      }
+    };
+    window.addEventListener('auth:401', handleAuth401);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener('auth:401', handleAuth401);
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string, rememberMe = false) => {

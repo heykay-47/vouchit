@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VoucherProvider } from "./contexts/VoucherContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { lazy, Suspense, Component, ReactNode } from 'react';
@@ -82,13 +82,20 @@ const queryClient = new QueryClient({
       networkMode: 'online',
     },
     mutations: {
-      retry: 1,
+      retry: 0,
       networkMode: 'online',
     }
   }
 });
 
 const basename = import.meta.env.BASE_URL || '/';
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
 
 // Layout wrapper with sidebar
 function AppLayout({ children }: { children: ReactNode }) {
@@ -119,9 +126,9 @@ const App = () => (
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/browse" element={<Browse />} />
-                      <Route path="/donate" element={<Donate />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/donate" element={<ProtectedRoute><Donate /></ProtectedRoute>} />
+                      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                       <Route path="/about" element={<About />} />
                       <Route path="/community" element={<Community />} />
                       <Route path="*" element={<NotFound />} />

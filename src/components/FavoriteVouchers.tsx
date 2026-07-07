@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVouchers } from '@/contexts/VoucherContext';
 import { Voucher } from '@/lib/types';
@@ -12,6 +13,7 @@ import { toast } from '@/utils/toast';
 export default function FavoriteVouchers() {
   const { user, toggleFavorite } = useAuth();
   const { vouchers } = useVouchers();
+  const navigate = useNavigate();
   const [favoriteVouchers, setFavoriteVouchers] = useState<Voucher[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -69,7 +71,7 @@ export default function FavoriteVouchers() {
             <Button
               variant="default"
               className="flex items-center gap-2"
-              onClick={() => window.location.href = '/browse'}
+              onClick={() => navigate('/browse')}
             >
               <Search className="h-4 w-4" />
               Browse Vouchers
