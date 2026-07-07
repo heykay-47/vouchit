@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +13,7 @@ import {
 import { VoucherPlatform } from '@/lib/types';
 import { useVouchers } from '@/contexts/VoucherContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadImage } from '@/services/upload';
 import { CalendarIcon, Upload, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -40,26 +40,20 @@ export default function DonateVoucher() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
 
-      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (!validImageTypes.includes(selectedFile.type)) {
         toast.error('invalid file type');
         return;
       }
 
-      const maxSizeInBytes = 5 * 1024 * 1024;
+      const maxSizeInBytes = 3 * 1024 * 1024;
       if (selectedFile.size > maxSizeInBytes) {
-        toast.error('file too large (max 5mb)');
+        toast.error('file too large (max 3mb)');
         return;
       }
 
       setImage(selectedFile);
-      
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const sanitizedUrl = DOMPurify.sanitize(reader.result as string);
-        setImagePreviewUrl(sanitizedUrl);
-      };
-      reader.readAsDataURL(selectedFile);
+      setImagePreviewUrl(URL.createObjectURL(selectedFile));
     }
   };
   
@@ -74,12 +68,13 @@ export default function DonateVoucher() {
     setIsSubmitting(true);
     
     try {
+      const imageUrl = await uploadImage(image);
       await donateVoucher({
         platform: platform as VoucherPlatform,
         title: title.trim(),
         description: description.trim(),
         code: code.trim(),
-        imageUrl: imagePreviewUrl as string,
+        imageUrl,
         expiryDate,
         value: value.trim() || undefined,
         donatedBy: isAuthenticated ? user!.id : 'Anonymous',
@@ -93,11 +88,12 @@ export default function DonateVoucher() {
       setValue('');
       setExpiryDate(undefined);
       setImage(null);
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
       setImagePreviewUrl(null);
       
       toast.success('voucher donated!');
     } catch (error) {
-      toast.error('failed to donate voucher');
+      toast.error(error instanceof Error ? error.message : 'failed to donate voucher');
       logger.error('Error donating voucher', error, {
         component: 'DonateVoucher',
       });

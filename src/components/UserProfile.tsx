@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import DOMPurify from 'dompurify';
 import { User } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { uploadImage } from '@/services/upload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,37 +37,21 @@ export default function UserProfile({ user }: UserProfileProps) {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
 
-      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      const validImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
       if (!validImageTypes.includes(selectedFile.type)) {
-        toast.error('Invalid file type. Please select an image file (jpeg, png, gif).');
+        toast.error('Invalid file type. Please select an image file (jpeg, png, gif, webp).');
         return;
       }
 
-      const maxSizeInBytes = 2 * 1024 * 1024;
+      const maxSizeInBytes = 3 * 1024 * 1024;
       if (selectedFile.size > maxSizeInBytes) {
-        toast.error('File size exceeds the 2MB limit. Please select a smaller file.');
+        toast.error('File size exceeds the 3MB limit. Please select a smaller file.');
         return;
       }
 
       setFile(selectedFile);
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const sanitizedUrl = DOMPurify.sanitize(reader.result as string);
-        setImageUrl(sanitizedUrl);
-      };
-      reader.readAsDataURL(e.target.files[0]);
+      setImageUrl(URL.createObjectURL(selectedFile));
     }
-  };
-
-  const uploadImage = async (): Promise<string> => {
-    if (!file) return user?.profileImage || '';
-
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
   };
 
   const handleSave = async () => {
@@ -79,7 +63,7 @@ export default function UserProfile({ user }: UserProfileProps) {
       let profileImageUrl = user.profileImage;
 
       if (file) {
-        profileImageUrl = await uploadImage();
+        profileImageUrl = await uploadImage(file);
       }
 
       await updateProfile({
@@ -89,10 +73,11 @@ export default function UserProfile({ user }: UserProfileProps) {
       });
 
       setImageUrl(profileImageUrl || '');
+      setFile(null);
       setIsEditing(false);
     } catch (error) {
       logger.error('Error updating profile', error, { component: 'UserProfile' });
-      toast.error('Failed to update profile');
+      toast.error(error instanceof Error ? error.message : 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,4 @@
-# VoucherSwap
+# VouchIt
 
 A voucher swapping platform where users can donate and redeem digital vouchers from Google Pay, PayTM, PhonePe, and other online platforms.
 
@@ -23,7 +23,7 @@ The API runs as Vercel serverless functions — in local dev it only works when 
 ### Environment Variables
 
 ```env
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/voucherswap
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/vouchit
 JWT_SECRET=replace-with-a-long-random-string
 NODE_ENV=development
 ```
@@ -108,15 +108,26 @@ Set these environment variables in the Vercel dashboard:
 MONGODB_URI=
 JWT_SECRET=
 NODE_ENV=production
+VITE_CLOUDINARY_CLOUD_NAME=
+VITE_CLOUDINARY_UPLOAD_PRESET=
 ```
 
 Deploy via Git. Frontend is served statically, API routes under `/api/*`.
 
+### Cloudinary (free image uploads)
+
+Voucher screenshots and profile images are uploaded to Cloudinary directly from the browser (no server processing, no DB bloat).
+
+1. Create a free Cloudinary account (no card required, 25 credits/month free).
+2. Go to Settings → Upload → Add an **unsigned** upload preset.
+3. Copy your **Cloud Name** (dashboard top-left) and the **preset name**.
+4. Add `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET` to `.env` and to Vercel environment variables.
+
 ### Docker
 
 ```sh
-docker build -t voucherswap .
-docker run -p 8080:8080 voucherswap
+docker build -t vouchit .
+docker run -p 8080:8080 vouchit
 ```
 
 Visit `http://localhost:8080`.
