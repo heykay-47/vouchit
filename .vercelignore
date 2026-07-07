@@ -1,0 +1,3 @@
+api/**/*.test.ts
+api/**/*.test.js
+docs/

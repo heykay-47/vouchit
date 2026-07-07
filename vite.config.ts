@@ -42,7 +42,9 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('framer-motion')) return 'framer-motion';
             if (id.includes('@radix-ui') || id.includes('@radix')) return 'radix';
             if (id.includes('react-router')) return 'router';
-            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) return 'react';
+            if (id.includes('node_modules/react/') ||
+                id.includes('node_modules/react-dom/') ||
+                id.includes('node_modules/scheduler/')) return 'react';
             return 'vendor';
           }
         },
