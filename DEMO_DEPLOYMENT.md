@@ -5,7 +5,7 @@ This project is ready for a free recruiter demo on Vercel Hobby plus MongoDB Atl
 ## 1. Create MongoDB Atlas M0
 
 1. Create a MongoDB Atlas account.
-2. Create a new project named `VoucherSwap Demo`.
+2. Create a new project named `VouchIt Demo`.
 3. Build a database and choose the free `M0` shared cluster.
 4. Create a database user with a generated password.
 5. Network access:
@@ -14,7 +14,7 @@ This project is ready for a free recruiter demo on Vercel Hobby plus MongoDB Atl
 6. Copy the connection string and replace `<password>` and database name:
 
 ```env
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/voucherswap?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/vouchit?retryWrites=true&w=majority
 ```
 
 ## 2. Configure Vercel
@@ -31,7 +31,7 @@ Install Command: npm install
 Add environment variables in Vercel Project Settings:
 
 ```env
-MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/voucherswap?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://<user>:<password>@<cluster-host>/vouchit?retryWrites=true&w=majority
 JWT_SECRET=<generate-a-long-random-secret>
 NODE_ENV=production
 ```
@@ -55,7 +55,7 @@ DEMO_PASSWORD="your-password" npm run seed:demo
 Demo login:
 
 ```text
-Email: demo@voucherswap.app
+Email: demo@vouchit.app
 Password: DemoPass123!
 ```
 

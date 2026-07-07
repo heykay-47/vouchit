@@ -142,17 +142,17 @@ const addDays = (days) => {
 
 const demoUsers = [
   {
-    email: 'demo@voucherswap.app',
+    email: 'demo@vouchit.app',
     username: 'demo_recruiter',
     bio: 'Recruiter demo account with sample favorites, redemptions, and notifications.',
   },
   {
-    email: 'maya@voucherswap.app',
+    email: 'maya@vouchit.app',
     username: 'maya_saves',
     bio: 'Shares grocery and food delivery offers with the community.',
   },
   {
-    email: 'arjun@voucherswap.app',
+    email: 'arjun@vouchit.app',
     username: 'arjun_deals',
     bio: 'Finds travel, payments, and shopping vouchers before they expire.',
   },
@@ -326,7 +326,7 @@ const run = async () => {
   }
 
   console.log('Demo seed complete');
-  console.log('Login: demo@voucherswap.app');
+  console.log('Login: demo@vouchit.app');
   console.log(`Password: ${password}`);
 };
 

@@ -116,9 +116,9 @@ export default function Sidebar() {
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
           <Link to="/" className="flex items-center gap-2" onClick={() => setIsMobileOpen(false)}>
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="font-bold text-primary-foreground text-sm">VS</span>
+              <span className="font-bold text-primary-foreground text-sm">VI</span>
             </div>
-            <span className="font-medium text-sm lowercase">voucherswap</span>
+            <span className="font-medium text-sm lowercase">vouchit</span>
           </Link>
           
           {/* Mobile Close Button */}

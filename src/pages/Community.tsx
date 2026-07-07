@@ -10,7 +10,7 @@ export default function Community() {
   const [activeTab, setActiveTab] = useState<Tab>('requests');
   
   useEffect(() => {
-    document.title = "Community - VoucherSwap";
+    document.title = "Community - VouchIt";
   }, []);
 
   const tabs: { id: Tab; label: string }[] = [

@@ -27,7 +27,7 @@ export default function OnboardingTour() {
   // Define the tour steps
   const steps: OnboardingStep[] = [
     {
-      title: 'Welcome to VoucherSwap!',
+      title: 'Welcome to VouchIt!',
       description: 'Join our community where unused vouchers find a new home. Let\'s get you started with a quick tour!',
       icon: <Gift className="h-12 w-12 text-primary" />
     },

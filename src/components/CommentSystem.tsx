@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DOMPurify from 'dompurify';
 import { useAuth } from '@/contexts/AuthContext';
 import { Comment } from '@/lib/types';
 import { communityService } from '@/services/community.service';
@@ -112,8 +111,6 @@ export default function CommentSystem({ voucherId }: CommentSystemProps) {
 }
 
 function CommentCard({ comment }: { comment: Comment }) {
-  const sanitizedText = DOMPurify.sanitize(comment.text);
-
   return (
     <div className="p-4 border rounded-md">
       <div className="flex items-start gap-3">
@@ -128,7 +125,7 @@ function CommentCard({ comment }: { comment: Comment }) {
               {formatDistanceToNow(comment.createdAt, { addSuffix: true })}
             </div>
           </div>
-          <p className="mt-2 text-sm" dangerouslySetInnerHTML={{ __html: sanitizedText }} />
+          <p className="mt-2 text-sm whitespace-pre-wrap">{comment.text}</p>
         </div>
       </div>
     </div>

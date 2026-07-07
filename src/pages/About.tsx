@@ -2,7 +2,7 @@ export default function About() {
   return (
     <div className="max-w-2xl">
       <header className="mb-8">
-        <h1 className="text-2xl font-medium lowercase mb-2">about voucherswap</h1>
+        <h1 className="text-2xl font-medium lowercase mb-2">about vouchit</h1>
         <p className="text-muted-foreground">
           a community platform for sharing unused vouchers
         </p>
@@ -12,7 +12,7 @@ export default function About() {
         <section>
           <h2 className="text-lg font-medium lowercase mb-3">what is this?</h2>
           <p className="text-muted-foreground leading-relaxed">
-            voucherswap helps you share unused vouchers from google pay, paytm, phonepe 
+            vouchit helps you share unused vouchers from google pay, paytm, phonepe 
             and other platforms with people who can actually use them. instead of letting 
             vouchers expire, donate them to the community.
           </p>

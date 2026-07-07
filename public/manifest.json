@@ -1,6 +1,6 @@
 {
-  "name": "VoucherSwap - Share and Exchange Vouchers",
-  "short_name": "VoucherSwap",
+  "name": "VouchIt - Share and Exchange Vouchers",
+  "short_name": "VouchIt",
   "description": "Share and exchange vouchers with your community. Find great deals and help others save money.",
   "start_url": "/",
   "display": "standalone",

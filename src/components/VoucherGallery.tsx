@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Suspense, lazy, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useVouchers } from '@/contexts/VoucherContext';
 import VoucherCard from './VoucherCard';
 import VoucherSkeleton from './VoucherSkeleton';
@@ -16,9 +16,6 @@ import { Filter, Search, SortAsc, Calendar, AlertCircle, Loader2 } from 'lucide-
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useInView } from 'react-intersection-observer';
-
-// Lazy load virtualization component
-const VoucherVirtualList = lazy(() => import('./VoucherVirtualList'));
 
 interface VoucherGalleryProps {
   title?: string;

@@ -1,10 +1,10 @@
-name: voucherswap
+name: vouchit
 region: nyc
 services:
 - name: web
   source_dir: /
   github:
-    repo: heykay-47/voucherswap
+    repo: heykay-47/vouchit
     branch: main
     deploy_on_push: true
   run_command: nginx -g "daemon off;"
