@@ -16,6 +16,12 @@ dist-ssr
 .env
 .env.local
 
+# Agent instructions
+AGENTS.md
+
+# WSL/NTFS alternate data streams
+*:Zone.Identifier
+
 supabase/.temp/
 docs/
 
