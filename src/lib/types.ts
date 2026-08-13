@@ -68,7 +68,9 @@ export interface AuthContextType {
 export interface VoucherContextType {
   vouchers: Voucher[];
   isLoading: boolean;
-  error: string | null;
+  loadError: string | null;
+  mutationError: string | null;
+  retryVouchers: () => Promise<void>;
   donateVoucher: (voucher: Omit<Voucher, 'id' | 'donatedAt' | 'reportCount' | 'isActive'>) => Promise<void>;
   redeemVoucher: (voucherId: string) => Promise<void>;
   reportVoucher: (voucherId: string) => Promise<void>;

@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+
     /* Minimal Light Mode - Clean whites */
     --background: 0 0% 100%;
     --foreground: 0 0% 9%;
@@ -49,6 +51,8 @@
   }
 
   .dark {
+    color-scheme: dark;
+
     /* Pure black background - cobalt style */
     --background: 0 0% 0%;
     --foreground: 0 0% 100%;
@@ -111,7 +115,8 @@
   /* Focus styles */
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
-    outline-offset: 2px;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 1px hsl(var(--foreground));
   }
   
   :focus:not(:focus-visible) {
@@ -144,7 +149,7 @@
   }
   
   .nav-item-active {
-    @apply bg-primary/10 text-primary;
+    @apply bg-primary/15 text-foreground;
   }
   
   .nav-item-inactive {
@@ -173,4 +178,13 @@
 
 .dark::-webkit-scrollbar-thumb:hover {
   background: hsl(0 0% 30%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -7,7 +7,12 @@ import { sortVouchers as sortVouchersUtil, searchVouchers as searchVouchersUtil 
 const VoucherContext = createContext<VoucherContextType | undefined>(undefined)
 
 export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data: vouchers = [], isLoading: isQueryLoading, error: queryError } = useVouchersQuery()
+  const {
+    data: vouchers = [],
+    isLoading: isQueryLoading,
+    error: queryError,
+    refetch,
+  } = useVouchersQuery()
   const [filteredVouchers, setFilteredVouchers] = useState<Voucher[]>(vouchers)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
@@ -27,18 +32,22 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return results
   }, [vouchers])
 
+  const retryVouchers = useCallback(async () => {
+    await refetch()
+  }, [refetch])
+
   const loadError = queryError
     ? queryError instanceof Error
       ? queryError.message
       : (queryError as { message?: string }).message ?? 'Failed to load vouchers'
     : null
 
-  const combinedError = mutationError ?? loadError ?? null
-
   const contextValue = useMemo(() => ({
     vouchers,
     isLoading: isQueryLoading,
-    error: combinedError,
+    loadError,
+    mutationError,
+    retryVouchers,
     donateVoucher,
     redeemVoucher,
     reportVoucher,
@@ -49,7 +58,9 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }), [
     vouchers,
     isQueryLoading,
-    combinedError,
+    loadError,
+    mutationError,
+    retryVouchers,
     donateVoucher,
     redeemVoucher,
     reportVoucher,
