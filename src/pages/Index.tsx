@@ -2,16 +2,40 @@ import { useState } from 'react';
 import { useVouchers } from '@/contexts/VoucherContext';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import VoucherCard from '@/components/VoucherCard';
+import VoucherSkeleton from '@/components/VoucherSkeleton';
+
+function VoucherGridSkeleton() {
+  return (
+    <div role="status" aria-live="polite">
+      <span className="sr-only">loading vouchers</span>
+      <div aria-hidden="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
+          <VoucherSkeleton key={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VoucherLoadError({ message, onRetry }: { message: string; onRetry: () => Promise<void> }) {
+  return (
+    <div role="alert" className="rounded-lg border border-border bg-card p-6">
+      <h1 className="text-lg font-medium lowercase">unable to load vouchers</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+      <Button className="mt-4 h-11" variant="outline" onClick={() => void onRetry()}>
+        try again
+      </Button>
+    </div>
+  );
+}
 
 export default function Index() {
-  const { vouchers } = useVouchers();
+  const { vouchers, isLoading, loadError, retryVouchers } = useVouchers();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Show active vouchers (not redeemed, not reported)
   const availableVouchers = vouchers.filter(v => v.isActive && !v.isRedeemed);
-  
-  // Filter by search
   const filteredVouchers = searchQuery
     ? availableVouchers.filter(v => 
         v.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -20,42 +44,56 @@ export default function Index() {
       )
     : availableVouchers;
 
+  if (isLoading) return <VoucherGridSkeleton />;
+  if (loadError) return <VoucherLoadError message={loadError} onRetry={retryVouchers} />;
+
+  const resultCount = filteredVouchers.length;
+  const resultCountCopy = resultCount === 1 ? '1 voucher found' : `${resultCount} vouchers found`;
+
   return (
     <div className="py-4">
-      {/* Header */}
-      <header className="text-center mb-8">
-        <h1 className="text-2xl font-medium lowercase mb-2">available vouchers</h1>
+      <header className="mb-8">
+        <h1 className="mb-2 text-2xl font-medium lowercase">available vouchers</h1>
         <p className="text-muted-foreground text-sm">
           {availableVouchers.length} vouchers ready to grab
         </p>
       </header>
 
-      {/* Search */}
-      <div className="max-w-md mx-auto mb-10">
+      <div className="mb-8 max-w-md">
+        <label className="sr-only" htmlFor="voucher-search">search vouchers</label>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            type="text"
-            placeholder="search vouchers..."
+            id="voucher-search"
+            type="search"
+            autoComplete="off"
+            placeholder="search vouchers"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-card border-border"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="h-11 bg-card pl-10"
           />
         </div>
+        <p role="status" aria-live="polite" className="mt-2 text-sm text-muted-foreground">
+          {resultCountCopy}
+        </p>
       </div>
 
-      {/* Voucher Grid */}
-      {filteredVouchers.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {availableVouchers.length === 0 ? (
+        <div className="py-16 text-center">
+          <p className="text-muted-foreground">no vouchers available yet</p>
+        </div>
+      ) : filteredVouchers.length === 0 ? (
+        <div className="py-16 text-center">
+          <p className="text-muted-foreground">no vouchers match your search</p>
+          <Button className="mt-4 h-11" variant="outline" onClick={() => setSearchQuery('')}>
+            clear search
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredVouchers.map((voucher) => (
             <VoucherCard key={voucher.id} voucher={voucher} />
           ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <p className="text-muted-foreground">
-            {searchQuery ? 'no vouchers match your search' : 'no vouchers available yet'}
-          </p>
         </div>
       )}
     </div>

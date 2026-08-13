@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthDialogProvider } from "@/contexts/AuthDialogContext";
 import { VoucherProvider } from "./contexts/VoucherContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { lazy, Suspense, Component, ReactNode } from 'react';
@@ -119,28 +120,30 @@ const App = () => (
       <TooltipProvider>
         <ThemeProvider>
           <AuthProvider>
-            <VoucherProvider>
-              <Toaster />
-              <Sonner />
-              <Analytics />
-              <SpeedInsights />
-              <BrowserRouter basename={basename}>
-                <Suspense fallback={<LoadingScreen />}>
-                  <AppLayout>
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/browse" element={<Browse />} />
-                      <Route path="/donate" element={<ProtectedRoute><Donate /></ProtectedRoute>} />
-                      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/community" element={<Community />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </AppLayout>
-                </Suspense>
-              </BrowserRouter>
-            </VoucherProvider>
+            <AuthDialogProvider>
+              <VoucherProvider>
+                <Toaster />
+                <Sonner />
+                <Analytics />
+                <SpeedInsights />
+                <BrowserRouter basename={basename}>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <AppLayout>
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/browse" element={<Browse />} />
+                        <Route path="/donate" element={<ProtectedRoute><Donate /></ProtectedRoute>} />
+                        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/community" element={<Community />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </AppLayout>
+                  </Suspense>
+                </BrowserRouter>
+              </VoucherProvider>
+            </AuthDialogProvider>
           </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>

@@ -11,9 +11,10 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'login' | 'signup';
+  returnFocus?: HTMLElement | null;
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', returnFocus }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -125,7 +126,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="sm:max-w-[425px]"
+        onCloseAutoFocus={(event) => {
+          if (!returnFocus) return;
+          event.preventDefault();
+          returnFocus.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl lowercase">
             {mode === 'login' ? 'welcome back' : 'create an account'}
@@ -172,6 +180,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                 autoComplete="email"
                 disabled={isSubmitting}
                 autoFocus
+                className="h-11"
               />
             </div>
 
@@ -200,6 +209,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                     autoComplete="username"
                     disabled={isSubmitting}
                     maxLength={50}
+                    className="h-11"
                   />
                   <p className="text-xs text-muted-foreground">
                     letters, numbers, underscores, and hyphens only
@@ -226,11 +236,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
                 minLength={6}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 disabled={isSubmitting}
+                className="h-11"
               />
             </div>
 
             {/* Remember Me */}
-            <div className="flex items-center space-x-2 pt-2">
+            <div className="flex min-h-11 items-center space-x-2 pt-2">
               <Checkbox
                 id="rememberMe"
                 checked={rememberMe}
@@ -239,7 +250,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
               />
               <Label
                 htmlFor="rememberMe"
-                className="text-sm font-normal cursor-pointer lowercase select-none"
+                className="flex min-h-11 flex-1 cursor-pointer select-none items-center text-sm font-normal lowercase"
               >
                 remember me
               </Label>
@@ -247,7 +258,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
           </div>
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full lowercase" disabled={isSubmitting}>
+          <Button type="submit" className="h-11 w-full lowercase" disabled={isSubmitting}>
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
@@ -266,26 +277,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }: Au
           {mode === 'login' ? (
             <p>
               don't have an account?{' '}
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={switchMode}
-                className="font-medium text-primary hover:underline focus:outline-none lowercase"
+                className="min-h-11 px-2 lowercase"
                 disabled={isSubmitting}
               >
                 sign up
-              </button>
+              </Button>
             </p>
           ) : (
             <p>
               already have an account?{' '}
-              <button
+              <Button
                 type="button"
+                variant="link"
                 onClick={switchMode}
-                className="font-medium text-primary hover:underline focus:outline-none lowercase"
+                className="min-h-11 px-2 lowercase"
                 disabled={isSubmitting}
               >
                 log in
-              </button>
+              </Button>
             </p>
           )}
         </div>
