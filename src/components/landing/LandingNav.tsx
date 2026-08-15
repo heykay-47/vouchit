@@ -60,7 +60,7 @@ export default function LandingNav() {
             aria-expanded={mobileOpen}
             aria-controls="landing-navigation"
             aria-label={mobileOpen ? 'close navigation' : 'open navigation'}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center lg:hidden"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center md:hidden"
             onClick={() => setMobileOpen((open) => !open)}
           >
             {mobileOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}

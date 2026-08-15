@@ -6,6 +6,7 @@ import Index from './Index';
 
 const landingState = vi.hoisted(() => ({
   isAuthenticated: false,
+  isDesktop: false,
   navigate: vi.fn(),
   openLogin: vi.fn(),
   reducedMotion: false,
@@ -41,9 +42,20 @@ function renderLanding(overrides: Partial<typeof landingState> = {}) {
 describe('Index', () => {
   beforeEach(() => {
     landingState.isAuthenticated = false;
+    landingState.isDesktop = false;
     landingState.reducedMotion = false;
     landingState.navigate.mockReset();
     landingState.openLogin.mockReset();
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(min-width: 768px)' && landingState.isDesktop,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
   });
 
   it('explains the exchange and exposes the primary action in the first viewport', () => {
@@ -83,7 +95,8 @@ describe('Index', () => {
     const menu = screen.getByRole('button', { name: 'open navigation' });
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveAttribute('aria-controls', 'landing-navigation');
-    expect(menu).toHaveClass('min-h-11', 'min-w-11');
+    expect(menu).toHaveClass('min-h-11', 'min-w-11', 'md:hidden');
+    expect(menu).not.toHaveClass('lg:hidden');
 
     await user.click(menu);
 
@@ -104,5 +117,26 @@ describe('Index', () => {
     expect(screen.getByTestId('exchange-marker')).toHaveAttribute('data-motion-state', 'reduced');
     expect(screen.getByTestId('exchange-connector')).toHaveAttribute('data-motion-state', 'reduced');
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('progresses the marker through all stage centers on the desktop track', () => {
+    renderLanding({ isDesktop: true });
+
+    const marker = screen.getByTestId('exchange-marker');
+    expect(marker).toHaveAttribute('data-motion-axis', 'horizontal');
+    expect(marker).toHaveAttribute('data-motion-stages', 'donated available claimed');
+    expect(screen.getByTestId('exchange-track')).toHaveClass('exchange-board__track');
+    expect(screen.getAllByRole('listitem').map((stage) => stage.getAttribute('data-stage'))).toEqual([
+      'donated',
+      'available',
+      'claimed',
+    ]);
+  });
+
+  it('uses the vertical track geometry below the desktop breakpoint', () => {
+    renderLanding({ isDesktop: false });
+
+    expect(screen.getByTestId('exchange-marker')).toHaveAttribute('data-motion-axis', 'vertical');
+    expect(screen.getByTestId('exchange-connector')).toHaveAttribute('data-motion-axis', 'vertical');
   });
 });
