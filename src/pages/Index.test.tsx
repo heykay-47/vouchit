@@ -1,102 +1,108 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Voucher } from '@/lib/types';
+import { BrowserRouter } from 'react-router-dom';
 import Index from './Index';
 
-const retryVouchers = vi.fn(async () => undefined);
-const useVouchersMock = vi.fn();
-
-const vouchers: Voucher[] = [
-  {
-    id: 'voucher-1',
-    platform: 'Google Pay',
-    title: 'Food Delivery Reward',
-    description: 'Valid on your next order',
-    code: '',
-    imageUrl: 'https://example.com/food.png',
-    value: 'INR 100',
-    donatedBy: 'donor-1',
-    donatedAt: new Date('2026-08-10T00:00:00Z'),
-    isRedeemed: false,
-    reportCount: 0,
-    isActive: true,
-  },
-  {
-    id: 'voucher-2',
-    platform: 'PhonePe',
-    title: 'Travel Reward',
-    description: 'Valid on bus tickets',
-    code: '',
-    imageUrl: 'https://example.com/travel.png',
-    donatedBy: 'donor-2',
-    donatedAt: new Date('2026-08-11T00:00:00Z'),
-    isRedeemed: false,
-    reportCount: 0,
-    isActive: true,
-  },
-];
-
-vi.mock('@/contexts/VoucherContext', () => ({
-  useVouchers: () => useVouchersMock(),
+const landingState = vi.hoisted(() => ({
+  isAuthenticated: false,
+  navigate: vi.fn(),
+  openLogin: vi.fn(),
+  reducedMotion: false,
 }));
 
-vi.mock('@/components/VoucherCard', () => ({
-  default: ({ voucher }: { voucher: Voucher }) => <div>{voucher.title}</div>,
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ isAuthenticated: landingState.isAuthenticated }),
 }));
+
+vi.mock('@/contexts/AuthDialogContext', () => ({
+  useAuthDialog: () => ({ openLogin: landingState.openLogin }),
+}));
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => landingState.navigate };
+});
+
+vi.mock('framer-motion', async () => {
+  const actual = await vi.importActual<typeof import('framer-motion')>('framer-motion');
+  return { ...actual, useReducedMotion: () => landingState.reducedMotion };
+});
+
+function renderLanding(overrides: Partial<typeof landingState> = {}) {
+  Object.assign(landingState, overrides);
+  return render(
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Index />
+    </BrowserRouter>,
+  );
+}
 
 describe('Index', () => {
   beforeEach(() => {
-    retryVouchers.mockClear();
-    useVouchersMock.mockReset();
+    landingState.isAuthenticated = false;
+    landingState.reducedMotion = false;
+    landingState.navigate.mockReset();
+    landingState.openLogin.mockReset();
   });
 
-  it('renders voucher skeletons while loading', () => {
-    useVouchersMock.mockReturnValue({ vouchers: [], isLoading: true, loadError: null, retryVouchers });
-    render(<Index />);
-    const status = screen.getByRole('status');
-    expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(status).toHaveTextContent('loading vouchers');
-    expect(status.querySelector('.sr-only')).toHaveTextContent('loading vouchers');
-    expect(status.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
+  it('explains the exchange and exposes the primary action in the first viewport', () => {
+    renderLanding();
+
+    expect(screen.getByRole('heading', { level: 1, name: "good vouchers shouldn't go unused." })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'browse vouchers' })).toHaveAttribute('href', '/browse');
+    expect(screen.getByRole('region', { name: 'how a voucher moves through vouchit' })).toBeInTheDocument();
+    expect(screen.getAllByText(/donated|available|claimed/i)).toHaveLength(3);
   });
 
-  it('renders a retryable load error', async () => {
+  it('continues to donate after successful authentication', async () => {
     const user = userEvent.setup();
-    useVouchersMock.mockReturnValue({ vouchers: [], isLoading: false, loadError: 'network error', retryVouchers });
-    render(<Index />);
-    expect(screen.getByRole('alert')).toHaveTextContent('unable to load vouchers');
-    const retry = screen.getByRole('button', { name: 'try again' });
-    expect(retry).toHaveClass('h-11');
-    await user.click(retry);
-    expect(retryVouchers).toHaveBeenCalledOnce();
+    landingState.openLogin.mockImplementation((_focus: HTMLElement, onAuthenticated?: () => void) => onAuthenticated?.());
+    renderLanding();
+
+    await user.click(screen.getByRole('button', { name: 'donate yours' }));
+
+    expect(landingState.openLogin).toHaveBeenCalledOnce();
+    expect(landingState.navigate).toHaveBeenCalledWith('/donate');
   });
 
-  it('renders the inventory-empty state separately from filtered-empty results', async () => {
+  it('navigates authenticated donors directly to donation', async () => {
     const user = userEvent.setup();
-    useVouchersMock.mockReturnValue({ vouchers: [], isLoading: false, loadError: null, retryVouchers });
-    const emptyView = render(<Index />);
-    expect(screen.getByText('no vouchers available yet')).toBeInTheDocument();
-    emptyView.unmount();
+    renderLanding({ isAuthenticated: true });
 
-    useVouchersMock.mockReturnValue({ vouchers, isLoading: false, loadError: null, retryVouchers });
-    render(<Index />);
-    await user.type(screen.getByRole('searchbox', { name: 'search vouchers' }), 'no match');
-    expect(screen.getByText('no vouchers match your search')).toBeInTheDocument();
-    const clearSearch = screen.getByRole('button', { name: 'clear search' });
-    expect(clearSearch).toHaveClass('h-11');
-    await user.click(clearSearch);
-    expect(screen.getByText('Food Delivery Reward')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'donate yours' }));
+
+    expect(landingState.navigate).toHaveBeenCalledWith('/donate');
+    expect(landingState.openLogin).not.toHaveBeenCalled();
   });
 
-  it('labels search and announces the filtered result count', async () => {
+  it('exposes mobile navigation semantics and closes on Escape or link activation', async () => {
     const user = userEvent.setup();
-    useVouchersMock.mockReturnValue({ vouchers, isLoading: false, loadError: null, retryVouchers });
-    render(<Index />);
-    const search = screen.getByRole('searchbox', { name: 'search vouchers' });
-    expect(search).toHaveAttribute('type', 'search');
-    expect(search).toHaveClass('h-11');
-    await user.type(search, 'Food');
-    expect(screen.getByRole('status')).toHaveTextContent('1 voucher found');
+    renderLanding();
+
+    const menu = screen.getByRole('button', { name: 'open navigation' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveAttribute('aria-controls', 'landing-navigation');
+    expect(menu).toHaveClass('min-h-11', 'min-w-11');
+
+    await user.click(menu);
+
+    expect(screen.getByRole('button', { name: 'close navigation' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('navigation', { name: 'primary navigation' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'open navigation' })).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'open navigation' }));
+    await user.click(within(screen.getByRole('navigation', { name: 'primary navigation' })).getByRole('link', { name: 'browse' }));
+    expect(screen.getByRole('button', { name: 'open navigation' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('renders the exchange stages in their final state when reduced motion is requested', () => {
+    renderLanding({ reducedMotion: true });
+
+    expect(screen.getByTestId('exchange-marker')).toHaveAttribute('data-motion-state', 'reduced');
+    expect(screen.getByTestId('exchange-connector')).toHaveAttribute('data-motion-state', 'reduced');
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 });
