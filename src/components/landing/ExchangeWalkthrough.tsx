@@ -16,26 +16,37 @@ export default function ExchangeWalkthrough() {
         <p>the path stays open to visitors until a claim needs an account.</p>
       </div>
       <div className="exchange-walkthrough__track">
-        <div className="exchange-walkthrough__path" aria-hidden="true" />
-        <motion.div
-          aria-hidden="true"
-          className="exchange-walkthrough__progress"
-          initial={reducedMotion ? false : { scale: 0 }}
-          whileInView={reducedMotion ? undefined : { scale: 1 }}
-          viewport={{ once: true, amount: 0.35 }}
-          data-motion-state={reducedMotion ? 'reduced' : 'staged'}
-        />
-        <ol className="exchange-walkthrough__steps" aria-label="vouchit exchange steps">
-          {steps.map(([number, label, description]) => (
-            <li key={label} className="exchange-walkthrough__step">
-              <span className="exchange-walkthrough__number" aria-hidden="true">{number}</span>
-              <div>
-                <h3>{label}</h3>
-                <p>{description}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div
+          className="exchange-walkthrough__geometry"
+          data-testid="exchange-walkthrough-geometry"
+          data-path-geometry="stage-centers"
+        >
+          <div
+            aria-hidden="true"
+            className="exchange-walkthrough__path"
+            data-testid="exchange-walkthrough-path"
+          />
+          <motion.div
+            aria-hidden="true"
+            className="exchange-walkthrough__progress"
+            initial={reducedMotion ? false : { scale: 0 }}
+            whileInView={reducedMotion ? undefined : { scale: 1 }}
+            viewport={{ once: true, amount: 0.35 }}
+            data-motion-state={reducedMotion ? 'reduced' : 'staged'}
+            data-testid="exchange-walkthrough-progress"
+          />
+          <ol className="exchange-walkthrough__steps" aria-label="vouchit exchange steps">
+            {steps.map(([number, label, description]) => (
+              <li key={label} className="exchange-walkthrough__step">
+                <span className="exchange-walkthrough__number" aria-hidden="true">{number}</span>
+                <div>
+                  <h3>{label}</h3>
+                  <p>{description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </section>
   );

@@ -145,11 +145,17 @@ describe('Index', () => {
     renderLanding();
 
     const walkthrough = screen.getByRole('region', { name: 'how to exchange a voucher' });
-    expect(within(walkthrough).getByRole('list', { name: 'vouchit exchange steps' })).toBeInTheDocument();
-    expect(within(walkthrough).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(walkthrough).getByText("share a wallet voucher you won't use")).toBeInTheDocument();
-    expect(within(walkthrough).getByText('browse active vouchers without an account')).toBeInTheDocument();
-    expect(within(walkthrough).getByText('sign in, claim once, and receive the protected details')).toBeInTheDocument();
+    const geometry = within(walkthrough).getByTestId('exchange-walkthrough-geometry');
+    const steps = within(geometry).getByRole('list', { name: 'vouchit exchange steps' });
+
+    expect(geometry).toHaveAttribute('data-path-geometry', 'stage-centers');
+    expect(within(geometry).getByTestId('exchange-walkthrough-path')).toBeInTheDocument();
+    expect(within(geometry).getByTestId('exchange-walkthrough-progress')).toBeInTheDocument();
+    expect(steps).toBeInTheDocument();
+    expect(within(steps).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(steps).getByText("share a wallet voucher you won't use")).toBeInTheDocument();
+    expect(within(steps).getByText('browse active vouchers without an account')).toBeInTheDocument();
+    expect(within(steps).getByText('sign in, claim once, and receive the protected details')).toBeInTheDocument();
   });
 
   it('includes the browse closing action and minimal footer links', () => {

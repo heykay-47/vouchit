@@ -448,23 +448,30 @@
     margin-top: 40px;
   }
 
+  .exchange-walkthrough__geometry {
+    --walkthrough-marker-size: 32px;
+    --walkthrough-marker-center: calc(var(--walkthrough-marker-size) / 2);
+    position: relative;
+  }
+
   .exchange-walkthrough__path,
   .exchange-walkthrough__progress {
     position: absolute;
-    left: 16px;
-    right: 16px;
-    top: 12px;
-    height: 1px;
+    left: var(--walkthrough-marker-center);
+    right: calc(33.333% - var(--walkthrough-marker-center));
+    top: var(--walkthrough-marker-center);
     transform-origin: left center;
   }
 
   .exchange-walkthrough__path {
+    height: 1px;
     background: hsl(var(--border));
   }
 
   .exchange-walkthrough__progress {
     z-index: 1;
     height: 2px;
+    margin-top: -1px;
     background: hsl(var(--primary));
   }
 
@@ -493,8 +500,8 @@
 
   .exchange-walkthrough__number {
     display: grid;
-    height: 32px;
-    width: 32px;
+    height: var(--walkthrough-marker-size);
+    width: var(--walkthrough-marker-size);
     place-items: center;
     border: 1px solid hsl(var(--primary));
     border-radius: 9999px;
@@ -693,12 +700,17 @@
     margin-top: 32px;
   }
 
+  .exchange-walkthrough__geometry {
+    --walkthrough-stage-height: 132px;
+    --walkthrough-stage-gap: 32px;
+  }
+
   .exchange-walkthrough__path,
   .exchange-walkthrough__progress {
-    bottom: 16px;
-    left: 16px;
+    bottom: calc(var(--walkthrough-stage-height) - var(--walkthrough-marker-center));
+    left: var(--walkthrough-marker-center);
     right: auto;
-    top: 12px;
+    top: var(--walkthrough-marker-center);
     width: 1px;
     height: auto;
     transform-origin: center top;
@@ -710,7 +722,8 @@
 
   .exchange-walkthrough__steps {
     grid-template-columns: 1fr;
-    gap: 32px;
+    grid-auto-rows: var(--walkthrough-stage-height);
+    gap: var(--walkthrough-stage-gap);
   }
 
   .exchange-walkthrough__step,
