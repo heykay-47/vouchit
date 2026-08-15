@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AuthModal from './AuthModal';
@@ -15,7 +15,11 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 describe('AuthModal', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    login.mockResolvedValue(undefined);
+    signup.mockResolvedValue(undefined);
+  });
 
   it('keeps every standalone form control and the remember row at least 44px tall', async () => {
     const user = userEvent.setup();
@@ -42,5 +46,59 @@ describe('AuthModal', () => {
       'focus-visible:ring-offset-2',
       'focus-visible:ring-offset-foreground',
     );
+  });
+
+  it('reports successful login through the authentication callback', async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    render(<AuthModal isOpen onClose={vi.fn()} onAuthenticated={onAuthenticated} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'email' }), 'user@example.com');
+    await user.type(screen.getByLabelText('password'), 'password');
+    await user.click(screen.getByRole('button', { name: 'log in' }));
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
+  });
+
+  it('reports successful signup through the authentication callback', async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    render(<AuthModal isOpen initialMode="signup" onClose={vi.fn()} onAuthenticated={onAuthenticated} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'email' }), 'new@example.com');
+    await user.type(screen.getByRole('textbox', { name: 'username' }), 'newuser');
+    await user.type(screen.getByLabelText('password'), 'password');
+    await user.click(screen.getByRole('button', { name: 'sign up' }));
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not report failed login through the authentication callback', async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    login.mockRejectedValueOnce(new Error('invalid credentials'));
+    render(<AuthModal isOpen onClose={vi.fn()} onAuthenticated={onAuthenticated} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'email' }), 'user@example.com');
+    await user.type(screen.getByLabelText('password'), 'password');
+    await user.click(screen.getByRole('button', { name: 'log in' }));
+
+    expect(await screen.findByText('invalid credentials')).toBeInTheDocument();
+    expect(onAuthenticated).not.toHaveBeenCalled();
+  });
+
+  it('does not report failed signup through the authentication callback', async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    signup.mockRejectedValueOnce(new Error('email already exists'));
+    render(<AuthModal isOpen initialMode="signup" onClose={vi.fn()} onAuthenticated={onAuthenticated} />);
+
+    await user.type(screen.getByRole('textbox', { name: 'email' }), 'new@example.com');
+    await user.type(screen.getByRole('textbox', { name: 'username' }), 'newuser');
+    await user.type(screen.getByLabelText('password'), 'password');
+    await user.click(screen.getByRole('button', { name: 'sign up' }));
+
+    expect(await screen.findByText('email already exists')).toBeInTheDocument();
+    expect(onAuthenticated).not.toHaveBeenCalled();
   });
 });
