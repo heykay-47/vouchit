@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 
 const steps = [
-  ['01', 'donate', "share a wallet voucher you won't use"],
+  ['01', 'donate', "sign in to share a wallet voucher you won't use"],
   ['02', 'discover', 'browse active vouchers without an account'],
   ['03', 'claim', 'sign in, claim once, and receive the protected details'],
 ] as const;
@@ -13,7 +13,7 @@ export default function ExchangeWalkthrough() {
     <section className="exchange-walkthrough" aria-labelledby="exchange-walkthrough-title">
       <div className="landing-section-heading">
         <h2 id="exchange-walkthrough-title">how to exchange a voucher</h2>
-        <p>the path stays open to visitors until a claim needs an account.</p>
+        <p>browsing is public; donating and claiming require authentication.</p>
       </div>
       <div className="exchange-walkthrough__track">
         <div

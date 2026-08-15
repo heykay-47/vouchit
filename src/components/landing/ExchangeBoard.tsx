@@ -50,7 +50,12 @@ export default function ExchangeBoard() {
         };
 
   return (
-    <section id="exchange-board" aria-labelledby="exchange-board-title" className="exchange-board">
+    <section
+      id="exchange-board"
+      aria-labelledby="exchange-board-title"
+      className="exchange-board exchange-board--first-viewport"
+      data-first-viewport="true"
+    >
       <h2 id="exchange-board-title" className="sr-only">
         how a voucher moves through vouchit
       </h2>

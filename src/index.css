@@ -236,15 +236,15 @@
   }
 
   .landing-page__body {
-    padding-block: clamp(40px, 8vw, 96px) 64px;
+    padding-block: clamp(24px, 4vw, 48px) 48px;
   }
 
   .landing-hero {
     display: grid;
     align-items: end;
-    gap: 48px;
-    min-height: min(58svh, 560px);
-    padding-block: 24px 64px;
+    gap: 20px;
+    min-height: 0;
+    padding-block: 0 24px;
   }
 
   .landing-hero__copy {
@@ -261,7 +261,7 @@
 
   .landing-hero p {
     max-width: 52ch;
-    margin-top: 24px;
+    margin-top: 16px;
     color: hsl(var(--muted-foreground));
     font-size: clamp(1rem, 1.8vw, 1.25rem);
     line-height: 1.5;
@@ -271,7 +271,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-top: 32px;
+    margin-top: 20px;
   }
 
   .landing-action {
@@ -313,8 +313,8 @@
 
   .exchange-board__canvas {
     position: relative;
-    min-height: 360px;
-    padding: 80px 48px;
+    min-height: 288px;
+    padding: 56px 40px;
   }
 
   .exchange-board__track {
@@ -334,7 +334,7 @@
 
   .exchange-board__stage {
     display: flex;
-    min-height: 200px;
+    min-height: 176px;
     flex-direction: column;
     gap: 24px;
     padding-inline: 8px;
@@ -589,8 +589,16 @@
 
   .landing-footer__links {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 8px 12px;
+  }
+
+  .landing-footer__link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding-inline: 4px;
   }
 
   .landing-footer__links a:hover {
@@ -660,8 +668,8 @@
 
 @media (max-width: 767px) {
   .exchange-board__canvas {
-    min-height: 500px;
-    padding: 56px 32px 56px 64px;
+    min-height: 352px;
+    padding: 32px 24px 32px 56px;
   }
 
   .exchange-board__stages {
@@ -670,8 +678,8 @@
   }
 
   .exchange-board__stage {
-    min-height: 128px;
-    gap: 16px;
+    min-height: 96px;
+    gap: 12px;
   }
 
   .exchange-board__path,

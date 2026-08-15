@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import type { Voucher } from '@/lib/types';
-import Index from './Index';
+import Index, { getAvailableVoucherCount } from './Index';
 
 const landingState = vi.hoisted(() => ({
   isAuthenticated: false,
@@ -84,8 +84,16 @@ describe('Index', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: "good vouchers shouldn't go unused." })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'browse vouchers' })[0]).toHaveAttribute('href', '/browse');
-    expect(screen.getByRole('region', { name: 'how a voucher moves through vouchit' })).toBeInTheDocument();
-    expect(screen.getAllByText(/donated|available|claimed/i)).toHaveLength(3);
+    const board = screen.getByRole('region', { name: 'how a voucher moves through vouchit' });
+    expect(board).toHaveClass('exchange-board--first-viewport');
+    expect(board).toHaveAttribute('data-first-viewport', 'true');
+    expect(within(board).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(board).getByText('donated')).toBeInTheDocument();
+    expect(within(board).getByText('shared by a community member')).toBeInTheDocument();
+    expect(within(board).getByText('available')).toBeInTheDocument();
+    expect(within(board).getByText('ready for someone who can use it')).toBeInTheDocument();
+    expect(within(board).getByText('claimed')).toBeInTheDocument();
+    expect(within(board).getByText('passed on before expiry')).toBeInTheDocument();
   });
 
   it.each([
@@ -96,6 +104,7 @@ describe('Index', () => {
     renderLanding(state);
 
     expect(screen.queryByText(/available right now/i)).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'browse vouchers' })).toHaveLength(2);
   });
 
   it('shows only active, unredeemed, unexpired vouchers in closing proof', () => {
@@ -130,6 +139,31 @@ describe('Index', () => {
     expect(screen.getByText('1 voucher available right now')).toBeInTheDocument();
   });
 
+  it('counts no-expiry and boundary-expiry vouchers while excluding inactive vouchers', () => {
+    const now = new Date('2026-08-15T12:00:00.000Z');
+    const voucher = (overrides: Partial<Voucher>): Voucher => ({
+      id: 'voucher-id',
+      platform: 'Other',
+      title: 'A useful voucher',
+      description: 'A voucher description',
+      code: 'protected-code',
+      imageUrl: '/voucher.png',
+      value: '₹100',
+      donatedBy: 'donor-id',
+      donatedAt: now,
+      isRedeemed: false,
+      reportCount: 0,
+      isActive: true,
+      ...overrides,
+    });
+
+    expect(getAvailableVoucherCount([
+      voucher({ id: 'no-expiry' }),
+      voucher({ id: 'expires-now', expiryDate: now }),
+      voucher({ id: 'inactive', isActive: false }),
+    ], now)).toBe(2);
+  });
+
   it('keeps trust facts factual and avoids unsupported claims', () => {
     renderLanding();
 
@@ -153,7 +187,7 @@ describe('Index', () => {
     expect(within(geometry).getByTestId('exchange-walkthrough-progress')).toBeInTheDocument();
     expect(steps).toBeInTheDocument();
     expect(within(steps).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(steps).getByText("share a wallet voucher you won't use")).toBeInTheDocument();
+    expect(within(steps).getByText("sign in to share a wallet voucher you won't use")).toBeInTheDocument();
     expect(within(steps).getByText('browse active vouchers without an account')).toBeInTheDocument();
     expect(within(steps).getByText('sign in, claim once, and receive the protected details')).toBeInTheDocument();
   });
@@ -164,9 +198,46 @@ describe('Index', () => {
     expect(screen.getAllByRole('link', { name: 'browse vouchers' })).toHaveLength(2);
     expect(screen.getByRole('contentinfo')).toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toHaveAttribute('data-layout', 'responsive');
-    expect(screen.getByRole('link', { name: 'community' })).toHaveAttribute('href', '/community');
-    expect(screen.getByRole('link', { name: 'about' })).toHaveAttribute('href', '/about');
-    expect(screen.getByRole('link', { name: 'vouchit repository' })).toHaveAttribute('href', 'https://github.com/heykay-47/vouchit.git');
+    const footer = screen.getByRole('contentinfo');
+    expect(within(footer).getByRole('link', { name: 'community' })).toHaveAttribute('href', '/community');
+    expect(within(footer).getByRole('link', { name: 'about' })).toHaveAttribute('href', '/about');
+    expect(within(footer).getByRole('link', { name: 'vouchit repository' })).toHaveAttribute('href', 'https://github.com/heykay-47/vouchit.git');
+  });
+
+  it('keeps footer links aligned to the 44px touch-target contract', () => {
+    renderLanding();
+
+    const footerLinks = within(screen.getByRole('contentinfo')).getAllByRole('link');
+    expect(footerLinks).toHaveLength(4);
+    footerLinks.forEach((link) => {
+      expect(link).toHaveClass('landing-footer__link', 'min-h-11');
+    });
+  });
+
+  it('includes community in the landing header navigation', () => {
+    renderLanding();
+
+    expect(within(screen.getByRole('navigation', { name: 'primary navigation' }))
+      .getByRole('link', { name: 'community' }))
+      .toHaveAttribute('href', '/community');
+  });
+
+  it('states that browsing is public while donation and claiming require authentication', () => {
+    renderLanding();
+
+    const walkthrough = screen.getByRole('region', { name: 'how to exchange a voucher' });
+    expect(within(walkthrough).getByText('browsing is public; donating and claiming require authentication.')).toBeInTheDocument();
+    expect(within(walkthrough).getByText("sign in to share a wallet voucher you won't use")).toBeInTheDocument();
+  });
+
+  it('uses neutral hover treatments for landing navigation and actions', () => {
+    renderLanding();
+
+    expect(screen.getByRole('button', { name: 'log in' })).toHaveClass('hover:bg-muted', 'hover:text-foreground');
+    expect(screen.getByRole('button', { name: 'donate yours' })).toHaveClass('hover:bg-muted', 'hover:text-foreground');
+    expect(within(screen.getByRole('navigation', { name: 'primary navigation' }))
+      .getByRole('link', { name: 'browse' }))
+      .toHaveClass('hover:bg-muted', 'hover:text-foreground');
   });
 
   it('continues to donate after successful authentication', async () => {

@@ -5,10 +5,11 @@ import { useVouchersQuery } from '@/hooks/useVouchersQuery'
 import { sortVouchers as sortVouchersUtil, searchVouchers as searchVouchersUtil } from '@/utils/voucher-utils'
 
 const VoucherContext = createContext<VoucherContextType | undefined>(undefined)
+const emptyVouchers: Voucher[] = []
 
 export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const {
-    data: vouchers = [],
+    data: vouchers = emptyVouchers,
     isLoading: isQueryLoading,
     error: queryError,
     refetch,

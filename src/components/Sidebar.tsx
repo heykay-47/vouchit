@@ -28,7 +28,7 @@ interface NavItem {
 }
 
 const primaryNav: NavItem[] = [
-  { icon: Ticket, label: 'browse', path: '/', authRequired: false },
+  { icon: Ticket, label: 'browse', path: '/browse', authRequired: false },
   { icon: Plus, label: 'donate', path: '/donate', authRequired: false },
 ];
 

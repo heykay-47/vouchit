@@ -75,10 +75,10 @@ export default function Index() {
         <div className="landing-frame landing-footer__inner">
           <span>vouchit, passed on by people.</span>
           <nav aria-label="footer navigation" className="landing-footer__links">
-            <Link to="/browse">browse</Link>
-            <Link to="/community">community</Link>
-            <Link to="/about">about</Link>
-            <a href="https://github.com/heykay-47/vouchit.git" aria-label="vouchit repository">repository</a>
+            <Link className="landing-footer__link min-h-11" to="/browse">browse</Link>
+            <Link className="landing-footer__link min-h-11" to="/community">community</Link>
+            <Link className="landing-footer__link min-h-11" to="/about">about</Link>
+            <a className="landing-footer__link min-h-11" href="https://github.com/heykay-47/vouchit.git" aria-label="vouchit repository">repository</a>
           </nav>
         </div>
       </footer>

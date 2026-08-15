@@ -60,12 +60,21 @@ describe('Sidebar', () => {
   });
 
   it('marks the active route as the current page', () => {
-    renderWithRouter(<Sidebar />, '/');
+    renderWithRouter(<Sidebar />, '/browse');
 
     expect(screen.getByRole('link', { name: 'browse' })).toHaveAttribute('aria-current', 'page');
     document.querySelectorAll('svg').forEach((icon) => {
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     });
+  });
+
+  it('takes browse to the operating browse route', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<Sidebar />, '/donate');
+
+    await user.click(screen.getByRole('link', { name: 'browse' }));
+
+    expect(window.location.pathname).toBe('/browse');
   });
 
   it('opens a named mobile dialog and restores menu focus after Escape', async () => {

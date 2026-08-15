@@ -37,9 +37,10 @@ export default function LandingNav() {
           aria-label="primary navigation"
           className={`landing-nav__links ${mobileOpen ? 'landing-nav__links--open' : ''}`}
         >
-          <Link to="#exchange-board" onClick={closeMobileNavigation}>how it works</Link>
-          <Link to="/about" onClick={closeMobileNavigation}>about vouchit</Link>
-          <Link to="/browse" onClick={closeMobileNavigation}>browse</Link>
+          <Link className="hover:bg-muted hover:text-foreground" to="#exchange-board" onClick={closeMobileNavigation}>how it works</Link>
+          <Link className="hover:bg-muted hover:text-foreground" to="/community" onClick={closeMobileNavigation}>community</Link>
+          <Link className="hover:bg-muted hover:text-foreground" to="/about" onClick={closeMobileNavigation}>about vouchit</Link>
+          <Link className="hover:bg-muted hover:text-foreground" to="/browse" onClick={closeMobileNavigation}>browse</Link>
         </nav>
 
         <div className="landing-nav__actions">
