@@ -323,7 +323,7 @@ describe('Index', () => {
     expect(screen.getByRole('button', { name: 'open navigation' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('keeps the exchange sequence visible as discrete changes when reduced motion is requested', () => {
+  it('renders the final exchange state immediately when reduced motion is requested', () => {
     vi.useFakeTimers();
 
     try {
@@ -335,19 +335,23 @@ describe('Index', () => {
 
       expect(marker).toHaveAttribute('data-motion-state', 'reduced');
       expect(connector).toHaveAttribute('data-motion-state', 'reduced');
-      expect(marker).toHaveAttribute('data-current-stage', 'donated');
-      expect(walkthrough).toHaveAttribute('data-current-step', 'donate');
-
-      act(() => vi.advanceTimersByTime(700));
-      expect(marker).toHaveAttribute('data-current-stage', 'available');
-      expect(walkthrough).toHaveAttribute('data-current-step', 'discover');
-
-      act(() => vi.advanceTimersByTime(700));
       expect(marker).toHaveAttribute('data-current-stage', 'claimed');
       expect(walkthrough).toHaveAttribute('data-current-step', 'claim');
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('uses a native fragment link for the how-it-works navigation', () => {
+    renderLanding();
+
+    expect(screen.getByRole('link', { name: 'how it works' })).toHaveAttribute('href', '#exchange-board');
+  });
+
+  it('keeps the marker visual inside a transform-based motion wrapper', () => {
+    renderLanding();
+
+    expect(screen.getByTestId('exchange-marker').parentElement).toHaveClass('exchange-board__marker-motion');
   });
 
   it('progresses the marker through all stage centers on the desktop track', () => {

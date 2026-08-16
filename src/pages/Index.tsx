@@ -46,7 +46,7 @@ export default function Index() {
             </p>
             <div className="landing-hero__actions">
               <Link className="landing-action landing-action--primary" to="/browse">browse vouchers</Link>
-              <Button type="button" variant="outline" className="landing-action" onClick={handleDonate}>
+              <Button type="button" variant="outline" className="landing-action hover:bg-muted hover:text-foreground" onClick={handleDonate}>
                 donate yours
               </Button>
             </div>

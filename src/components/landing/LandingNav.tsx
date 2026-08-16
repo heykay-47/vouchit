@@ -37,7 +37,7 @@ export default function LandingNav() {
           aria-label="primary navigation"
           className={`landing-nav__links ${mobileOpen ? 'landing-nav__links--open' : ''}`}
         >
-          <Link className="hover:bg-muted hover:text-foreground" to="#exchange-board" onClick={closeMobileNavigation}>how it works</Link>
+          <a className="hover:bg-muted hover:text-foreground" href="#exchange-board" onClick={closeMobileNavigation}>how it works</a>
           <Link className="hover:bg-muted hover:text-foreground" to="/community" onClick={closeMobileNavigation}>community</Link>
           <Link className="hover:bg-muted hover:text-foreground" to="/about" onClick={closeMobileNavigation}>about vouchit</Link>
           <Link className="hover:bg-muted hover:text-foreground" to="/browse" onClick={closeMobileNavigation}>browse</Link>
@@ -47,7 +47,7 @@ export default function LandingNav() {
           <Button
             type="button"
             variant="ghost"
-            className="min-h-11 px-3"
+            className="min-h-11 px-3 hover:bg-muted hover:text-foreground"
             onClick={(event) => {
               closeMobileNavigation();
               openLogin(event.currentTarget);

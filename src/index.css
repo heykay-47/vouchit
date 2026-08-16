@@ -309,6 +309,10 @@
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     background-color: hsl(var(--card));
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.45) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.45) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
 
   .exchange-board__canvas {
@@ -410,9 +414,15 @@
     background: hsl(var(--primary));
   }
 
+  .exchange-board__marker-motion {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+
   .exchange-board__marker {
     position: absolute;
-    z-index: 3;
     left: 16px;
     top: 8px;
     display: grid;
@@ -675,11 +685,6 @@
     transition-duration: 0.01ms !important;
   }
 
-  .exchange-board__marker,
-  .exchange-board__connector {
-    transition-duration: 0.01ms !important;
-    transform: none !important;
-  }
 }
 
 @media (min-width: 768px) {

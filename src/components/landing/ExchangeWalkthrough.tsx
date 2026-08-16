@@ -18,6 +18,11 @@ export default function ExchangeWalkthrough() {
   useEffect(() => {
     if (!isInView) return;
 
+    if (reducedMotion) {
+      setActiveStep(steps.length - 1);
+      return;
+    }
+
     setActiveStep(0);
     const discoverTimer = window.setTimeout(() => setActiveStep(1), stepDelay);
     const claimTimer = window.setTimeout(() => setActiveStep(2), stepDelay * 2);
@@ -26,7 +31,7 @@ export default function ExchangeWalkthrough() {
       window.clearTimeout(discoverTimer);
       window.clearTimeout(claimTimer);
     };
-  }, [isInView]);
+  }, [isInView, reducedMotion]);
 
   return (
     <section className="exchange-walkthrough" aria-labelledby="exchange-walkthrough-title">

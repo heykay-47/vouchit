@@ -43,6 +43,11 @@ export default function ExchangeBoard() {
   useEffect(() => {
     if (!isInView) return;
 
+    if (reducedMotion) {
+      setActiveStage(exchangeStages.length - 1);
+      return;
+    }
+
     setActiveStage(0);
     const availableTimer = window.setTimeout(() => setActiveStage(1), stageDelay);
     const claimedTimer = window.setTimeout(() => setActiveStage(2), stageDelay * 2);
@@ -51,13 +56,11 @@ export default function ExchangeBoard() {
       window.clearTimeout(availableTimer);
       window.clearTimeout(claimedTimer);
     };
-  }, [isInView]);
+  }, [isInView, reducedMotion]);
 
-  const horizontalPositions = ['16px', 'calc(33.333% + 16px)', 'calc(66.666% + 16px)'];
-  const verticalPositions = ['8px', 'calc(33.333% + 8px)', 'calc(66.666% + 8px)'];
-  const markerAnimation = isHorizontal
-    ? { left: horizontalPositions[activeStage], top: '8px' }
-    : { left: 'auto', right: '0px', top: verticalPositions[activeStage] };
+  const markerOffset = isHorizontal
+    ? { x: `${activeStage * 33.333}%`, y: '0%' }
+    : { x: '0%', y: `${activeStage * 33.333}%` };
 
   return (
     <section
@@ -89,18 +92,22 @@ export default function ExchangeBoard() {
             transition={reducedMotion ? { duration: 0 } : { duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           />
           <motion.div
-            aria-hidden="true"
-            className="exchange-board__marker"
-            data-testid="exchange-marker"
-            data-motion-axis={isHorizontal ? 'horizontal' : 'vertical'}
-            data-motion-stages={motionStages}
-            data-motion-state={reducedMotion ? 'reduced' : 'staged'}
-            data-current-stage={exchangeStages[activeStage].id}
+            className="exchange-board__marker-motion"
             initial={false}
-            animate={markerAnimation}
+            animate={markerOffset}
             transition={reducedMotion ? { duration: 0 } : { duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            <Ticket aria-hidden="true" />
+            <div
+              aria-hidden="true"
+              className="exchange-board__marker"
+              data-testid="exchange-marker"
+              data-motion-axis={isHorizontal ? 'horizontal' : 'vertical'}
+              data-motion-stages={motionStages}
+              data-motion-state={reducedMotion ? 'reduced' : 'staged'}
+              data-current-stage={exchangeStages[activeStage].id}
+            >
+              <Ticket />
+            </div>
           </motion.div>
 
           <ol className="exchange-board__stages">
