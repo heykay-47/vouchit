@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
@@ -8,6 +8,7 @@ import Index, { getAvailableVoucherCount } from './Index';
 const landingState = vi.hoisted(() => ({
   isAuthenticated: false,
   isDesktop: false,
+  isInView: true,
   isLoading: false,
   loadError: null as string | null,
   navigate: vi.fn(),
@@ -39,7 +40,11 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('framer-motion', async () => {
   const actual = await vi.importActual<typeof import('framer-motion')>('framer-motion');
-  return { ...actual, useReducedMotion: () => landingState.reducedMotion };
+  return {
+    ...actual,
+    useInView: () => landingState.isInView,
+    useReducedMotion: () => landingState.reducedMotion,
+  };
 });
 
 vi.stubGlobal('IntersectionObserver', class {
@@ -61,6 +66,7 @@ describe('Index', () => {
   beforeEach(() => {
     landingState.isAuthenticated = false;
     landingState.isDesktop = false;
+    landingState.isInView = true;
     landingState.isLoading = false;
     landingState.loadError = null;
     landingState.reducedMotion = false;
@@ -68,7 +74,7 @@ describe('Index', () => {
     landingState.openLogin.mockReset();
     landingState.vouchers = [];
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === '(min-width: 768px)' && landingState.isDesktop,
+      matches: query === '(min-width: 560px)' && landingState.isDesktop,
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -93,7 +99,14 @@ describe('Index', () => {
     expect(within(board).getByText('available')).toBeInTheDocument();
     expect(within(board).getByText('ready for someone who can use it')).toBeInTheDocument();
     expect(within(board).getByText('claimed')).toBeInTheDocument();
-    expect(within(board).getByText('passed on before expiry')).toBeInTheDocument();
+    expect(within(board).getByText('reserved for its claimant')).toBeInTheDocument();
+  });
+
+  it('states the expiry deadline once instead of repeating it in claimed copy', () => {
+    renderLanding();
+
+    const board = screen.getByRole('region', { name: 'how a voucher moves through vouchit' });
+    expect(within(board).getAllByText(/before expiry/i)).toHaveLength(1);
   });
 
   it.each([
@@ -192,6 +205,32 @@ describe('Index', () => {
     expect(within(steps).getByText('sign in, claim once, and receive the protected details')).toBeInTheDocument();
   });
 
+  it('draws the walkthrough line while activating donate, discover, then claim', () => {
+    vi.useFakeTimers();
+
+    try {
+      renderLanding();
+
+      const geometry = screen.getByTestId('exchange-walkthrough-geometry');
+      const steps = within(geometry).getAllByRole('listitem');
+      const progress = within(geometry).getByTestId('exchange-walkthrough-progress');
+
+      expect(geometry).toHaveAttribute('data-motion-sequence', 'donate discover claim');
+      expect(progress).toHaveAttribute('data-current-step', 'donate');
+      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['current', 'upcoming', 'upcoming']);
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(progress).toHaveAttribute('data-current-step', 'discover');
+      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['reached', 'current', 'upcoming']);
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(progress).toHaveAttribute('data-current-step', 'claim');
+      expect(steps.map((step) => step.getAttribute('data-state'))).toEqual(['reached', 'reached', 'current']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('includes the browse closing action and minimal footer links', () => {
     renderLanding();
 
@@ -284,12 +323,31 @@ describe('Index', () => {
     expect(screen.getByRole('button', { name: 'open navigation' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('renders the exchange stages in their final state when reduced motion is requested', () => {
-    renderLanding({ reducedMotion: true });
+  it('keeps the exchange sequence visible as discrete changes when reduced motion is requested', () => {
+    vi.useFakeTimers();
 
-    expect(screen.getByTestId('exchange-marker')).toHaveAttribute('data-motion-state', 'reduced');
-    expect(screen.getByTestId('exchange-connector')).toHaveAttribute('data-motion-state', 'reduced');
-    expect(within(screen.getByTestId('exchange-track')).getAllByRole('listitem')).toHaveLength(3);
+    try {
+      renderLanding({ reducedMotion: true });
+
+      const marker = screen.getByTestId('exchange-marker');
+      const connector = screen.getByTestId('exchange-connector');
+      const walkthrough = screen.getByTestId('exchange-walkthrough-progress');
+
+      expect(marker).toHaveAttribute('data-motion-state', 'reduced');
+      expect(connector).toHaveAttribute('data-motion-state', 'reduced');
+      expect(marker).toHaveAttribute('data-current-stage', 'donated');
+      expect(walkthrough).toHaveAttribute('data-current-step', 'donate');
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(marker).toHaveAttribute('data-current-stage', 'available');
+      expect(walkthrough).toHaveAttribute('data-current-step', 'discover');
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(marker).toHaveAttribute('data-current-stage', 'claimed');
+      expect(walkthrough).toHaveAttribute('data-current-step', 'claim');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('progresses the marker through all stage centers on the desktop track', () => {
@@ -297,6 +355,7 @@ describe('Index', () => {
 
     const marker = screen.getByTestId('exchange-marker');
     expect(marker).toHaveAttribute('data-motion-axis', 'horizontal');
+    expect(window.matchMedia).toHaveBeenCalledWith('(min-width: 560px)');
     expect(marker).toHaveAttribute('data-motion-stages', 'donated available claimed');
     expect(screen.getByTestId('exchange-track')).toHaveClass('exchange-board__track');
     expect(within(screen.getByTestId('exchange-track')).getAllByRole('listitem').map((stage) => stage.getAttribute('data-stage'))).toEqual([
@@ -306,9 +365,34 @@ describe('Index', () => {
     ]);
   });
 
+  it('activates donated, available, then claimed after the board enters view', () => {
+    vi.useFakeTimers();
+
+    try {
+      renderLanding({ isDesktop: true });
+
+      const marker = screen.getByTestId('exchange-marker');
+      const stages = within(screen.getByTestId('exchange-track')).getAllByRole('listitem');
+
+      expect(marker).toHaveAttribute('data-current-stage', 'donated');
+      expect(stages.map((stage) => stage.getAttribute('data-state'))).toEqual(['current', 'upcoming', 'upcoming']);
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(marker).toHaveAttribute('data-current-stage', 'available');
+      expect(stages.map((stage) => stage.getAttribute('data-state'))).toEqual(['reached', 'current', 'upcoming']);
+
+      act(() => vi.advanceTimersByTime(700));
+      expect(marker).toHaveAttribute('data-current-stage', 'claimed');
+      expect(stages.map((stage) => stage.getAttribute('data-state'))).toEqual(['reached', 'reached', 'current']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses the vertical track geometry below the desktop breakpoint', () => {
     renderLanding({ isDesktop: false });
 
+    expect(screen.getByTestId('exchange-track')).toHaveAttribute('data-rail-side', 'inline-end');
     expect(screen.getByTestId('exchange-marker')).toHaveAttribute('data-motion-axis', 'vertical');
     expect(screen.getByTestId('exchange-connector')).toHaveAttribute('data-motion-axis', 'vertical');
   });

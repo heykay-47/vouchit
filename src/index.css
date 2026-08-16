@@ -338,6 +338,23 @@
     flex-direction: column;
     gap: 24px;
     padding-inline: 8px;
+    transition: color 300ms ease;
+  }
+
+  .exchange-board__stage[data-state="upcoming"] h3 {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .exchange-board__stage[data-state="upcoming"] .exchange-board__node {
+    border-color: hsl(var(--border));
+  }
+
+  .exchange-board__stage[data-state="current"] h3 {
+    color: hsl(var(--primary));
+  }
+
+  .exchange-board__stage[data-state="reached"] .exchange-board__node {
+    background: hsl(var(--primary));
   }
 
   .exchange-board__node {
@@ -366,7 +383,7 @@
 
   .exchange-board__expiry {
     display: inline-flex;
-    margin-top: 16px;
+    margin-top: 8px;
     border-bottom: 2px solid hsl(var(--accent));
     color: hsl(var(--foreground));
     font-size: 0.75rem;
@@ -490,6 +507,25 @@
     gap: 16px;
     min-width: 0;
     padding-inline: 0 24px;
+    transition: color 300ms ease;
+  }
+
+  .exchange-walkthrough__step[data-state="upcoming"] h3 {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .exchange-walkthrough__step[data-state="upcoming"] .exchange-walkthrough__number {
+    border-color: hsl(var(--border));
+    color: hsl(var(--muted-foreground));
+  }
+
+  .exchange-walkthrough__step[data-state="current"] h3 {
+    color: hsl(var(--primary));
+  }
+
+  .exchange-walkthrough__step[data-state="reached"] .exchange-walkthrough__number {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
   }
 
   .exchange-walkthrough__step:last-child {
@@ -666,10 +702,10 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 559px) {
   .exchange-board__canvas {
-    min-height: 352px;
-    padding: 32px 24px 32px 56px;
+    min-height: 400px;
+    padding: 32px 56px 32px 24px;
   }
 
   .exchange-board__stages {
@@ -678,15 +714,23 @@
   }
 
   .exchange-board__stage {
-    min-height: 96px;
-    gap: 12px;
+    position: relative;
+    display: block;
+    min-height: 112px;
+    padding: 0 56px 0 8px;
+  }
+
+  .exchange-board__node {
+    position: absolute;
+    right: 8px;
+    top: 0;
   }
 
   .exchange-board__path,
   .exchange-board__connector {
     bottom: calc(33.333% - 8px);
-    left: 16px;
-    right: auto;
+    left: auto;
+    right: 16px;
     top: 8px;
     width: 1px;
     height: auto;
@@ -698,10 +742,14 @@
   }
 
   .exchange-board__marker {
-    left: 16px;
+    left: auto;
+    right: 0;
     top: 8px;
+    margin: -16px 0 0;
   }
+}
 
+@media (max-width: 767px) {
   .exchange-walkthrough__track {
     margin-top: 32px;
   }
