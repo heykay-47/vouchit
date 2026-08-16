@@ -12,9 +12,10 @@ interface AuthModalProps {
   onClose: () => void;
   initialMode?: 'login' | 'signup';
   returnFocus?: HTMLElement | null;
+  onAuthenticated?: () => void;
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', returnFocus }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', returnFocus, onAuthenticated }: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -112,16 +113,18 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
       } else {
         await signup(email.trim(), username.trim(), password, rememberMe);
       }
-      // Modal will close via useEffect when isAuthenticated changes
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('An unexpected error occurred');
       }
+      return;
     } finally {
       setIsSubmitting(false);
     }
+
+    onAuthenticated?.();
   };
 
   return (

@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { AuthDialogProvider } from "@/contexts/AuthDialogContext";
 import { VoucherProvider } from "./contexts/VoucherContext";
@@ -100,14 +100,14 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// Layout wrapper with sidebar
-function AppLayout({ children }: { children: ReactNode }) {
+// Operating routes share the sidebar while the landing route stays standalone.
+function OperatingLayout() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
       <main className="lg:ml-56 min-h-screen">
         <div className="max-w-4xl mx-auto px-4 py-8 pt-16 lg:pt-8">
-          {children}
+          <Outlet />
         </div>
       </main>
     </div>
@@ -128,9 +128,9 @@ const App = () => (
                 <SpeedInsights />
                 <BrowserRouter basename={basename}>
                   <Suspense fallback={<LoadingScreen />}>
-                    <AppLayout>
-                      <Routes>
-                        <Route path="/" element={<Index />} />
+                    <Routes>
+                      <Route path="/" element={<Index />} />
+                      <Route element={<OperatingLayout />}>
                         <Route path="/browse" element={<Browse />} />
                         <Route path="/donate" element={<ProtectedRoute><Donate /></ProtectedRoute>} />
                         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -138,8 +138,8 @@ const App = () => (
                         <Route path="/about" element={<About />} />
                         <Route path="/community" element={<Community />} />
                         <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </AppLayout>
+                      </Route>
+                    </Routes>
                   </Suspense>
                 </BrowserRouter>
               </VoucherProvider>
