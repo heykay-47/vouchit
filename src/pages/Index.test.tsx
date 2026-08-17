@@ -2,6 +2,8 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Voucher } from '@/lib/types';
 import Index, { getAvailableVoucherCount } from './Index';
 
@@ -203,6 +205,17 @@ describe('Index', () => {
     expect(within(steps).getByText("sign in to share a wallet voucher you won't use")).toBeInTheDocument();
     expect(within(steps).getByText('browse active vouchers without an account')).toBeInTheDocument();
     expect(within(steps).getByText('sign in, claim once, and receive the protected details')).toBeInTheDocument();
+  });
+
+  it('stacks desktop walkthrough copy below the connector rail', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+    const desktopStyles = css.slice(
+      css.indexOf('@media (min-width: 768px)'),
+      css.indexOf('@media (max-width: 559px)'),
+    );
+
+    expect(desktopStyles).toMatch(/\.exchange-walkthrough__step\s*\{[^}]*display:\s*block;/s);
+    expect(desktopStyles).toMatch(/\.exchange-walkthrough__step h3\s*\{[^}]*margin-top:\s*16px;/s);
   });
 
   it('draws the walkthrough line while activating donate, discover, then claim', () => {

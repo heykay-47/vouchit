@@ -705,6 +705,14 @@
   .landing-hero {
     grid-template-columns: minmax(0, 1fr) 220px;
   }
+
+  .exchange-walkthrough__step {
+    display: block;
+  }
+
+  .exchange-walkthrough__step h3 {
+    margin-top: 16px;
+  }
 }
 
 @media (max-width: 559px) {
