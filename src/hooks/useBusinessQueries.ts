@@ -9,6 +9,7 @@ import type {
   CampaignInventoryCandidate,
   SettlementInput,
 } from '@/lib/types';
+import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
 
 export const businessQueryKeys = {
   all: ['business'] as const,
@@ -96,6 +97,7 @@ export const useRecordSettlementMutation = () => {
       await Promise.all([
         invalidateCampaign(queryClient, result.campaign.id),
         queryClient.invalidateQueries({ queryKey: businessQueryKeys.invoices() }),
+        queryClient.invalidateQueries({ queryKey: vouchersQueryKey }),
       ]);
     },
   });

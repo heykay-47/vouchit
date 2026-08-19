@@ -3,10 +3,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import CampaignDetailsForm from '@/components/business/CampaignDetailsForm';
 import CampaignInventoryImport from '@/components/business/CampaignInventoryImport';
+import CampaignInvoice from '@/components/business/CampaignInvoice';
 import CampaignStages, { type CampaignStage } from '@/components/business/CampaignStages';
+import SettlementForm from '@/components/business/SettlementForm';
 import {
   useBusinessCampaignQuery,
   useCreateCampaignMutation,
+  useIssueInvoiceMutation,
   useUpdateCampaignMutation,
 } from '@/hooks/useBusinessQueries';
 import type { CampaignDraftInput, CampaignStatus } from '@/lib/types';
@@ -25,6 +28,7 @@ export default function CampaignWorkspace() {
   const query = useBusinessCampaignQuery(id ?? '');
   const createMutation = useCreateCampaignMutation();
   const updateMutation = useUpdateCampaignMutation();
+  const issueMutation = useIssueInvoiceMutation();
   const campaign = query.data?.campaign;
   const isNew = !id;
   const isLocked = Boolean(campaign?.lockedAt) || (campaign ? campaign.status !== 'draft' : false);
@@ -46,6 +50,10 @@ export default function CampaignWorkspace() {
     }
     const created = await createMutation.mutateAsync(input);
     navigate(`/business/campaigns/${created.campaign.id}`);
+  };
+
+  const issueInvoice = async () => {
+    if (campaign) await issueMutation.mutateAsync(campaign.id);
   };
 
   if (query.isLoading && !isNew) return <p className="py-4 text-sm text-muted-foreground">loading campaign...</p>;
@@ -81,6 +89,31 @@ export default function CampaignWorkspace() {
       {campaign ? (
         <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
           <CampaignInventoryImport campaignId={campaign.id} disabled={isLocked} onConfirmed={() => void query.refetch()} />
+        </div>
+      ) : null}
+
+      {campaign && query.data && campaign.status === 'draft' && query.data.inventoryCount > 0 && !query.data.invoice ? (
+        <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+          <section aria-labelledby="invoice-quote-title" className="space-y-4">
+            <div>
+              <h2 id="invoice-quote-title" className="text-lg font-medium lowercase">invoice quote</h2>
+              <p className="text-sm text-muted-foreground">issue an invoice using the current server inventory count.</p>
+            </div>
+            <Button type="button" onClick={() => void issueInvoice()} disabled={issueMutation.isPending} className="w-full lowercase sm:w-auto">
+              {issueMutation.isPending ? 'issuing...' : 'issue invoice'}
+            </Button>
+          </section>
+        </div>
+      ) : null}
+
+      {query.data?.invoice ? (
+        <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+          <CampaignInvoice invoice={query.data.invoice} />
+          {query.data.invoice.status === 'issued' ? (
+            <div className="mt-6 border-t border-border pt-6">
+              <SettlementForm invoice={query.data.invoice} />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </section>

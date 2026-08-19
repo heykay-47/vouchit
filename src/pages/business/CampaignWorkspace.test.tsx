@@ -14,6 +14,8 @@ const queryState = vi.hoisted(() => ({
 }));
 const createMutation = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const updateMutation = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
+const issueMutation = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
+const settlementMutation = vi.hoisted(() => ({ mutateAsync: vi.fn(), isPending: false }));
 const detailsProps = vi.hoisted(() => ({ disabled: false }));
 const importProps = vi.hoisted(() => ({ onConfirmed: null as (() => void) | null, disabled: false }));
 
@@ -21,6 +23,8 @@ vi.mock('@/hooks/useBusinessQueries', () => ({
   useBusinessCampaignQuery: () => queryState,
   useCreateCampaignMutation: () => createMutation,
   useUpdateCampaignMutation: () => updateMutation,
+  useIssueInvoiceMutation: () => issueMutation,
+  useRecordSettlementMutation: () => settlementMutation,
 }));
 vi.mock('@/components/business/CampaignDetailsForm', () => ({
   default: function MockCampaignDetailsForm(props: { initialValues?: Partial<CampaignDraftInput>; onSubmit: (input: CampaignDraftInput) => void; disabled?: boolean }) {
@@ -80,6 +84,7 @@ describe('CampaignWorkspace', () => {
       return workspace;
     });
     updateMutation.mutateAsync.mockResolvedValue(workspace);
+    issueMutation.mutateAsync.mockResolvedValue(workspace.invoice);
   });
 
   it('derives the inventory stage from server workspace data and renders all semantic stages', () => {
@@ -119,5 +124,40 @@ describe('CampaignWorkspace', () => {
     importProps.onConfirmed();
 
     expect(queryState.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers invoice issuance after inventory is ready', async () => {
+    const user = userEvent.setup();
+    renderWorkspace('/business/campaigns/campaign-1');
+
+    await user.click(screen.getByRole('button', { name: 'issue invoice' }));
+
+    expect(issueMutation.mutateAsync).toHaveBeenCalledWith('campaign-1');
+  });
+
+  it('renders invoice and settlement stages from issued server data', () => {
+    queryState.data = {
+      ...workspace,
+      campaign: { ...workspace.campaign, status: 'awaiting_payment', effectiveStatus: 'awaiting_payment' },
+      invoice: {
+        id: 'invoice-1',
+        campaignId: 'campaign-1',
+        businessId: 'business-1',
+        priceVersion: 'v1',
+        currency: 'INR',
+        baseFeePaise: 9900,
+        perVoucherFeePaise: 200,
+        quantity: 2,
+        totalPaise: 10300,
+        status: 'issued',
+        issuedAt: new Date('2026-08-19T03:00:00.000Z'),
+      },
+    };
+
+    renderWorkspace('/business/campaigns/campaign-1');
+
+    expect(screen.getByRole('listitem', { name: /invoice/i })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('heading', { name: 'campaign invoice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'record external payment' })).toBeInTheDocument();
   });
 });
