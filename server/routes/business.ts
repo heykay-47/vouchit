@@ -6,6 +6,7 @@ import {
   previewCampaignInventory,
   type CampaignInventoryCandidate,
 } from '../lib/campaign-inventory.js';
+import { calculateCampaignAnalytics } from '../lib/campaign-analytics.js';
 import { quoteCampaign } from '../lib/campaign-pricing.js';
 import { toCampaignResponse } from '../lib/business-serializers.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
@@ -96,21 +97,31 @@ const requireBusinessProfile = async (
 const campaignWorkspace = async (
   campaign: CampaignDocument,
   profile: BusinessProfileDocument,
+  data?: { vouchers?: Record<string, unknown>[]; invoice?: InvoiceDocument | null },
 ) => {
   if (idFor(campaign.businessProfileId) !== idFor(profile._id)) {
     throw new ApiError(404, 'Business profile not found');
   }
 
-  const inventoryCount = await Voucher.countDocuments({
-    campaignId: campaign._id,
-    sourceType: 'campaign',
-  });
+  const vouchers = data?.vouchers ?? [];
+  const inventoryCount = data?.vouchers
+    ? vouchers.length
+    : await Voucher.countDocuments({
+        campaignId: campaign._id,
+        sourceType: 'campaign',
+      });
+  const invoice = data?.invoice ?? null;
+  const campaignResponse = toCampaignResponse(campaign, profile.organizationName);
+  const analytics = invoice?.status === 'paid'
+    && (campaignResponse.effectiveStatus === 'active' || campaignResponse.effectiveStatus === 'completed')
+    ? calculateCampaignAnalytics(vouchers, invoice)
+    : null;
 
   return {
-    ...toCampaignResponse(campaign, profile.organizationName),
+    ...campaignResponse,
     inventoryCount,
-    invoice: null,
-    analytics: null,
+    invoice: invoice ? toInvoiceResponse(invoice) : null,
+    analytics,
   };
 };
 
@@ -209,9 +220,32 @@ router.get('/campaigns', asyncRoute(async (req, res) => {
   const businessId = userIdFrom(req as AuthedRequest);
   const campaigns = await Campaign.find({ businessId }).sort({ createdAt: -1 }).lean();
   const profile = campaigns.length > 0 ? await requireBusinessProfile(businessId) : null;
+
+  const campaignIds = campaigns.map((campaign) => idFor(campaign._id));
+  const [campaignVouchers, campaignInvoices] = campaignIds.length > 0
+    ? await Promise.all([
+        Voucher.find({ campaignId: { $in: campaignIds }, sourceType: 'campaign' }).lean(),
+        Invoice.find({ campaignId: { $in: campaignIds }, businessId }).lean(),
+      ])
+    : [[], []];
+  const vouchersByCampaign = new Map<string, Record<string, unknown>[]>();
+  campaignVouchers.forEach((voucher: Record<string, unknown>) => {
+    const campaignId = idFor(voucher.campaignId);
+    const current = vouchersByCampaign.get(campaignId) ?? [];
+    current.push(voucher);
+    vouchersByCampaign.set(campaignId, current);
+  });
+  const invoicesByCampaign = new Map<string, InvoiceDocument>();
+  campaignInvoices.forEach((invoice: InvoiceDocument) => {
+    invoicesByCampaign.set(idFor(invoice.campaignId), invoice);
+  });
+
   ok(res, {
     campaigns: profile
-      ? await Promise.all(campaigns.map((campaign) => campaignWorkspace(campaign, profile)))
+      ? await Promise.all(campaigns.map((campaign) => campaignWorkspace(campaign, profile, {
+          vouchers: vouchersByCampaign.get(idFor(campaign._id)) ?? [],
+          invoice: invoicesByCampaign.get(idFor(campaign._id)) ?? null,
+        })))
       : [],
   });
 }));
@@ -236,7 +270,11 @@ router.post('/campaigns', asyncRoute(async (req, res) => {
 router.get('/campaigns/:id', asyncRoute(async (req, res) => {
   const campaign = await requireOwnedCampaign(req as AuthedRequest);
   const profile = await requireBusinessProfile(idFor(campaign.businessId));
-  ok(res, { campaign: await campaignWorkspace(campaign, profile) });
+  const [vouchers, invoice] = await Promise.all([
+    Voucher.find({ campaignId: campaign._id, sourceType: 'campaign' }).lean(),
+    Invoice.findOne({ campaignId: campaign._id, businessId: campaign.businessId }),
+  ]);
+  ok(res, { campaign: await campaignWorkspace(campaign, profile, { vouchers, invoice }) });
 }));
 
 router.patch('/campaigns/:id', asyncRoute(async (req, res) => {

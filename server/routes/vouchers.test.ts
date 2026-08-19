@@ -65,10 +65,12 @@ vi.mock('../models/Voucher', () => {
       }),
       findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
       findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
-        const voucher = vouchers.find((voucher) => voucher._id.toString() === '507f1f77bcf86cd799439012');
+        const voucher = vouchers.find((item) => item._id.toString() === filter._id.toString());
         if (!voucher) return null;
+        if (filter.sourceType !== undefined && filter.sourceType !== voucher.sourceType) return null;
         if (filter.isActive !== undefined && filter.isActive !== voucher.isActive) return null;
         if (filter.isRedeemed !== undefined && filter.isRedeemed !== voucher.isRedeemed) return null;
+        if (filter.expiryDate?.$gt && (!voucher.expiryDate || voucher.expiryDate <= filter.expiryDate.$gt)) return null;
         if (filter.donatedBy && typeof filter.donatedBy === 'object' && filter.donatedBy.$ne !== undefined) {
           if (voucher.donatedBy && voucher.donatedBy.toString() === filter.donatedBy.$ne.toString()) return null;
         }
@@ -78,6 +80,12 @@ vi.mock('../models/Voucher', () => {
           || (condition.expiryDate?.$gt && (!voucher.expiryDate || voucher.expiryDate > condition.expiryDate.$gt))
         ))) return null;
         Object.assign(voucher, update);
+        if (update.$inc) {
+          Object.entries(update.$inc).forEach(([key, value]) => {
+            voucher[key] = (voucher[key] ?? 0) + (value as number);
+          });
+          delete voucher.$inc;
+        }
         return voucher;
       }),
       findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
@@ -406,6 +414,57 @@ describe('voucher routes', () => {
       { sourceType: 'community' },
       { sourceType: { $exists: false } },
     ]));
+  });
+
+  it('records a view only for an active unredeemed unexpired campaign voucher', async () => {
+    const voucher = {
+      _id: { toString: () => '507f1f77bcf86cd799439012' },
+      sourceType: 'campaign',
+      isActive: true,
+      isRedeemed: false,
+      expiryDate: new Date(Date.now() + 60_000),
+      viewCount: 0,
+      code: 'SECRET-CODE',
+    };
+    vouchers.push(voucher);
+
+    const response = await request(createApp())
+      .post('/api/vouchers/507f1f77bcf86cd799439012/view')
+      .expect(200);
+
+    expect(response.body).toEqual({ data: { recorded: true }, error: null });
+    expect(voucher.viewCount).toBe(1);
+    expect(response.body.data.code).toBeUndefined();
+    expect(Voucher.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: '507f1f77bcf86cd799439012',
+        sourceType: 'campaign',
+        isActive: true,
+        isRedeemed: false,
+        expiryDate: { $gt: expect.any(Date) },
+      }),
+      { $inc: { viewCount: 1 } },
+      { new: true },
+    );
+  });
+
+  it.each(['community', 'unpaid', 'expired', 'missing'])('does not increment a %s voucher view', async (kind) => {
+    const voucher = {
+      _id: { toString: () => '507f1f77bcf86cd799439012' },
+      sourceType: kind === 'community' ? 'community' : 'campaign',
+      isActive: kind !== 'unpaid',
+      isRedeemed: false,
+      expiryDate: kind === 'expired' ? new Date(Date.now() - 60_000) : new Date(Date.now() + 60_000),
+      viewCount: 4,
+    };
+    if (kind !== 'missing') vouchers.push(voucher);
+
+    const response = await request(createApp())
+      .post('/api/vouchers/507f1f77bcf86cd799439012/view')
+      .expect(200);
+
+    expect(response.body).toEqual({ data: { recorded: true }, error: null });
+    expect(voucher.viewCount).toBe(4);
   });
 
   it('batch-loads campaign and business profile attribution for campaign cards', async () => {

@@ -103,6 +103,13 @@ vi.mock('../models/Campaign', () => ({
 }));
 vi.mock('../models/Voucher', () => ({
   Voucher: {
+    find: vi.fn((query: Record<string, unknown>) => chain(vouchers.filter((voucher) => {
+      const campaignIds = query.campaignId as { $in?: unknown[] } | undefined;
+      return voucher.sourceType === query.sourceType && (
+        campaignIds?.$in?.some((id) => String(id) === String(voucher.campaignId))
+        ?? String(voucher.campaignId) === String(query.campaignId)
+      );
+    }))),
     countDocuments: vi.fn(async (query: Record<string, unknown>) => vouchers.filter((voucher) => String(voucher.campaignId) === String(query.campaignId)).length),
     deleteMany: vi.fn(async (query: Record<string, unknown>, _options?: { session?: object }) => {
       for (let index = vouchers.length - 1; index >= 0; index -= 1) {
@@ -135,6 +142,11 @@ vi.mock('../models/Voucher', () => ({
 }));
 vi.mock('../models/Invoice', () => ({
   Invoice: {
+    find: vi.fn((query: Record<string, unknown>) => chain(invoices.filter((invoice) => {
+      const campaignIds = query.campaignId as { $in?: unknown[] } | undefined;
+      return invoice.businessId === query.businessId
+        && campaignIds?.$in?.some((id) => String(id) === String(invoice.campaignId));
+    }))),
     findById: vi.fn(async (id: string) => invoices.find((invoice) => String(invoice._id) === String(id)) ?? null),
     findOne: vi.fn(async (query: Record<string, unknown>) => invoices.find((invoice) => (
       (query._id === undefined || String(invoice._id) === String(query._id))
@@ -298,6 +310,94 @@ describe('business routes', () => {
       .toEqual([organizationName, organizationName]);
     expect(BusinessProfile.findOne).toHaveBeenCalledOnce();
     expect(BusinessProfile.findOne).toHaveBeenCalledWith({ userId: businessId });
+  });
+
+  it('joins paid campaign analytics with one bounded voucher and invoice query', async () => {
+    const { campaign, invoice } = seedIssuedInvoice({ status: 'paid', paidAt: new Date('2026-08-19T00:02:00.000Z') });
+    campaign.status = 'active';
+    vouchers.push(
+      {
+        campaignId,
+        sourceType: 'campaign',
+        isRedeemed: true,
+        redeemedAt: new Date('2026-08-18T12:00:00.000Z'),
+        expiryDate: campaign.expiryDate,
+        reportCount: 0,
+        viewCount: 7,
+      },
+      {
+        campaignId,
+        sourceType: 'campaign',
+        isRedeemed: false,
+        expiryDate: campaign.expiryDate,
+        reportCount: 0,
+        viewCount: 3,
+      },
+    );
+
+    const response = await request(createApp())
+      .get('/api/business/campaigns')
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(response.body.data.campaigns[0]).toMatchObject({
+      status: 'active',
+      effectiveStatus: 'active',
+      inventoryCount: 2,
+      invoice: { id: invoice._id.toString(), status: 'paid' },
+      analytics: {
+        totalInventory: 2,
+        views: 10,
+        claimedBeforeExpiry: 1,
+        remaining: 1,
+        claimRate: 0.5,
+      },
+    });
+    expect(Voucher.find).toHaveBeenCalledOnce();
+    expect(Voucher.find).toHaveBeenCalledWith({
+      campaignId: { $in: [campaignId] },
+      sourceType: 'campaign',
+    });
+    expect(Invoice.find).toHaveBeenCalledOnce();
+    expect(Invoice.find).toHaveBeenCalledWith({
+      campaignId: { $in: [campaignId] },
+      businessId,
+    });
+  });
+
+  it('keeps analytics null before payment and observes completed paid campaigns in detail', async () => {
+    const { campaign, invoice } = seedIssuedInvoice({ status: 'paid', paidAt: new Date('2026-08-19T00:02:00.000Z') });
+    campaign.status = 'completed';
+    vouchers.push({
+      campaignId,
+      sourceType: 'campaign',
+      isRedeemed: true,
+      redeemedAt: new Date('2026-08-18T12:00:00.000Z'),
+      expiryDate: campaign.expiryDate,
+      reportCount: 0,
+      viewCount: 2,
+    });
+
+    const paidResponse = await request(createApp())
+      .get(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(paidResponse.body.data.campaign.effectiveStatus).toBe('completed');
+    expect(paidResponse.body.data.campaign.analytics).toMatchObject({
+      totalInventory: 1,
+      views: 2,
+      claimedBeforeExpiry: 1,
+    });
+
+    campaign.status = 'awaiting_payment';
+    invoice.status = 'issued';
+    const unpaidResponse = await request(createApp())
+      .get(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(unpaidResponse.body.data.campaign.analytics).toBeNull();
   });
 
   it('returns a safe error when an owned campaign has no business profile', async () => {

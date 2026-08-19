@@ -117,6 +117,28 @@ router.post('/', requireAuth, requireRole('customer'), asyncRoute(async (req, re
   ok(res, { voucher: toVoucherResponse(voucher, userId) }, 201);
 }));
 
+router.post('/:id/view', asyncRoute(async (req, res) => {
+  await connectDb();
+  const voucherId = req.params.id;
+  if (!mongoose.isValidObjectId(voucherId)) {
+    throw new ApiError(400, 'Invalid voucher id');
+  }
+
+  await Voucher.findOneAndUpdate(
+    {
+      _id: voucherId,
+      sourceType: 'campaign',
+      isActive: true,
+      isRedeemed: false,
+      expiryDate: { $gt: new Date() },
+    },
+    { $inc: { viewCount: 1 } },
+    { new: true },
+  );
+
+  ok(res, { recorded: true });
+}));
+
 router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const userId = (req as AuthedRequest).userId;
