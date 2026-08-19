@@ -24,10 +24,20 @@ let duplicateInvoiceOnCreate = false;
 let failVoucherActivation = false;
 
 const chain = (value: unknown) => {
-  const query = {
-    sort: () => query,
-    lean: async () => value,
-  };
+    const query = {
+      sort: (sorting: Record<string, number>) => {
+        const [field, direction] = Object.entries(sorting)[0] ?? [];
+        if (Array.isArray(value) && field && direction) {
+          value.sort((left, right) => {
+            const leftValue = new Date((left as Record<string, unknown>)[field] as string | Date).getTime();
+            const rightValue = new Date((right as Record<string, unknown>)[field] as string | Date).getTime();
+            return (leftValue - rightValue) * direction;
+          });
+        }
+        return query;
+      },
+      lean: async () => value,
+    };
   return query;
 };
 
@@ -141,12 +151,12 @@ vi.mock('../models/Voucher', () => ({
   },
 }));
 vi.mock('../models/Invoice', () => ({
-  Invoice: {
-    find: vi.fn((query: Record<string, unknown>) => chain(invoices.filter((invoice) => {
-      const campaignIds = query.campaignId as { $in?: unknown[] } | undefined;
-      return invoice.businessId === query.businessId
-        && campaignIds?.$in?.some((id) => String(id) === String(invoice.campaignId));
-    }))),
+    Invoice: {
+      find: vi.fn((query: Record<string, unknown>) => chain(invoices.filter((invoice) => {
+        const campaignIds = query.campaignId as { $in?: unknown[] } | undefined;
+        return (query.businessId === undefined || invoice.businessId === query.businessId)
+          && (campaignIds === undefined || campaignIds.$in?.some((id) => String(id) === String(invoice.campaignId)));
+      }))),
     findById: vi.fn(async (id: string) => invoices.find((invoice) => String(invoice._id) === String(id)) ?? null),
     findOne: vi.fn(async (query: Record<string, unknown>) => invoices.find((invoice) => (
       (query._id === undefined || String(invoice._id) === String(query._id))
@@ -294,6 +304,70 @@ describe('business routes', () => {
     expect(listResponse.body.data.campaigns).toHaveLength(1);
     expect(listResponse.body.data.campaigns[0].organizationName).toBe(organizationName);
     expect(Campaign.find).toHaveBeenCalledWith({ businessId });
+  });
+
+  it('lists only owned invoices newest first with the invoice serializer', async () => {
+    invoices.push(
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439032' },
+        campaignId: '507f1f77bcf86cd799439014',
+        businessId,
+        priceVersion: 'v1',
+        currency: 'INR',
+        baseFeePaise: 9900,
+        perVoucherFeePaise: 200,
+        quantity: 1,
+        totalPaise: 10100,
+        status: 'issued',
+        issuedAt: new Date('2026-08-19T01:00:00.000Z'),
+      },
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439033' },
+        campaignId: '507f1f77bcf86cd799439015',
+        businessId,
+        priceVersion: 'v1',
+        currency: 'INR',
+        baseFeePaise: 9900,
+        perVoucherFeePaise: 200,
+        quantity: 2,
+        totalPaise: 10300,
+        status: 'paid',
+        issuedAt: new Date('2026-08-19T02:00:00.000Z'),
+        paidAt: new Date('2026-08-19T03:00:00.000Z'),
+        externalPaymentReference: 'BANK-003',
+        externalPaymentDate: new Date('2026-08-19T02:30:00.000Z'),
+      },
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439034' },
+        campaignId: '507f1f77bcf86cd799439016',
+        businessId: otherBusinessId,
+        priceVersion: 'v1',
+        currency: 'INR',
+        baseFeePaise: 9900,
+        perVoucherFeePaise: 200,
+        quantity: 1,
+        totalPaise: 10100,
+        status: 'issued',
+        issuedAt: new Date('2026-08-19T04:00:00.000Z'),
+      },
+    );
+
+    const response = await request(createApp())
+      .get('/api/business/invoices')
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(response.body.data.invoices.map((invoice: { id: string }) => invoice.id)).toEqual([
+      '507f1f77bcf86cd799439033',
+      '507f1f77bcf86cd799439032',
+    ]);
+    expect(response.body.data.invoices[0]).toMatchObject({
+      status: 'paid',
+      paidAt: '2026-08-19T03:00:00.000Z',
+      externalPaymentReference: 'BANK-003',
+      externalPaymentDate: '2026-08-19T02:30:00.000Z',
+    });
+    expect(Invoice.find).toHaveBeenCalledWith({ businessId });
   });
 
   it('uses one bounded profile lookup when listing multiple campaigns', async () => {

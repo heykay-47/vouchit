@@ -116,5 +116,15 @@ describe('BusinessDashboard', () => {
     expect(screen.getByText('₹109.00')).toBeInTheDocument();
     expect(screen.getByText(/outstanding/i)).toBeInTheDocument();
     expect(screen.getByText(/recent invoices/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 campaign has no observed analytics/i)).toBeInTheDocument();
+  });
+
+  it('does not render observed zeroes when every campaign analytics value is unavailable', () => {
+    campaignQuery.data = [campaign('campaign-1', 'Unpaid campaign', 'awaiting_payment', null)];
+
+    render(<MemoryRouter><BusinessDashboard /></MemoryRouter>);
+
+    expect(screen.getAllByText('not available')).toHaveLength(2);
+    expect(screen.getByText('no campaigns have observed analytics')).toBeInTheDocument();
   });
 });

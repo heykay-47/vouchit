@@ -16,15 +16,26 @@ export default function BusinessDashboard() {
   const invoices = invoicesQuery.data ?? [];
   const isLoading = campaignsQuery.isLoading || invoicesQuery.isLoading;
   const error = campaignsQuery.error || invoicesQuery.error;
+  const campaignsWithAnalytics = campaigns.filter(({ analytics }) => analytics !== null);
+  const campaignsWithoutAnalytics = campaigns.length - campaignsWithAnalytics.length;
   const statusCounts = statuses.map((status) => ({
     status,
     count: campaigns.filter(({ campaign }) => campaign.effectiveStatus === status).length,
   }));
-  const aggregateViews = campaigns.reduce((total, { analytics }) => total + (analytics?.views ?? 0), 0);
-  const aggregateClaims = campaigns.reduce(
-    (total, { analytics }) => total + (analytics?.claimedBeforeExpiry ?? 0),
-    0,
-  );
+  const aggregateViews = campaignsWithAnalytics.length > 0
+    ? campaignsWithAnalytics.reduce((total, { analytics }) => total + (analytics?.views ?? 0), 0)
+    : null;
+  const aggregateClaims = campaignsWithAnalytics.length > 0
+    ? campaignsWithAnalytics.reduce(
+      (total, { analytics }) => total + (analytics?.claimedBeforeExpiry ?? 0),
+      0,
+    )
+    : null;
+  const analyticsCoverage = campaignsWithAnalytics.length === 0
+    ? 'no campaigns have observed analytics'
+    : campaignsWithoutAnalytics > 0
+      ? `${campaignsWithoutAnalytics} campaign${campaignsWithoutAnalytics === 1 ? '' : 's'} ${campaignsWithoutAnalytics === 1 ? 'has' : 'have'} no observed analytics`
+      : `observed across ${campaignsWithAnalytics.length} campaign${campaignsWithAnalytics.length === 1 ? '' : 's'}`;
   const outstandingPaise = invoices.reduce(
     (total, invoice) => total + (invoice.status === 'paid' ? 0 : invoice.totalPaise),
     0,
@@ -68,17 +79,18 @@ export default function BusinessDashboard() {
           <dl className="grid gap-3 text-sm sm:grid-cols-3">
             <div className="rounded-lg border border-border bg-card p-4">
               <dt className="text-muted-foreground">aggregate views</dt>
-              <dd className="text-lg font-medium">{aggregateViews}</dd>
+              <dd className="text-lg font-medium">{aggregateViews ?? 'not available'}</dd>
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <dt className="text-muted-foreground">aggregate claims</dt>
-              <dd className="text-lg font-medium">{aggregateClaims}</dd>
+              <dd className="text-lg font-medium">{aggregateClaims ?? 'not available'}</dd>
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <dt className="text-muted-foreground">outstanding totals</dt>
               <dd className="text-lg font-medium">{formatPaiseAsInr(outstandingPaise)}</dd>
             </div>
           </dl>
+          <p className="-mt-6 text-sm text-muted-foreground">{analyticsCoverage}</p>
 
           <CampaignList campaigns={campaigns} />
 

@@ -250,6 +250,14 @@ router.get('/campaigns', asyncRoute(async (req, res) => {
   });
 }));
 
+router.get('/invoices', asyncRoute(async (req, res) => {
+  await connectDb();
+  const businessId = userIdFrom(req as AuthedRequest);
+  const invoices = await Invoice.find({ businessId }).sort({ issuedAt: -1 }).lean();
+
+  ok(res, { invoices: invoices.map(toInvoiceResponse) });
+}));
+
 router.post('/campaigns', asyncRoute(async (req, res) => {
   await connectDb();
   const input = campaignSchema.parse(req.body);
