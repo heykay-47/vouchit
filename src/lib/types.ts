@@ -2,6 +2,9 @@ export type VoucherPlatform = 'Google Pay' | 'Paytm' | 'PhonePe' | 'Other';
 export type VoucherCategory = 'Food' | 'Shopping' | 'Travel' | 'Entertainment' | 'Electronics' | 'Health' | 'Other';
 export type UserRole = 'customer' | 'business';
 
+export type CampaignStatus = 'draft' | 'awaiting_payment' | 'active' | 'completed';
+export type CampaignCompletionReason = 'claimed' | 'expired';
+
 export type SignupInput =
   | {
       role: 'customer';
@@ -59,6 +62,91 @@ export interface Voucher {
   reportCount: number; // Number of "not working" reports
   isActive: boolean; // False if reportCount >= 5 or manually deactivated
   category?: VoucherCategory;
+}
+
+export interface Campaign {
+  id: string;
+  businessId: string;
+  businessProfileId: string;
+  organizationName: string;
+  title: string;
+  brandName: string;
+  description: string;
+  terms: string;
+  platform: VoucherPlatform;
+  category: VoucherCategory;
+  imageUrl: string;
+  expiryDate: Date;
+  status: CampaignStatus;
+  effectiveStatus: CampaignStatus;
+  completionReason?: CampaignCompletionReason;
+  lockedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type CampaignDraftInput = Pick<
+  Campaign,
+  'title' | 'brandName' | 'description' | 'terms' | 'platform' | 'category' | 'imageUrl'
+> & { expiryDate: string };
+
+export interface CampaignAnalytics {
+  totalInventory: number;
+  views: number;
+  claimedBeforeExpiry: number;
+  deactivated: number;
+  expired: number;
+  remaining: number;
+  claimRate: number;
+  feePerClaimPaise: number | null;
+}
+
+export interface Invoice {
+  id: string;
+  campaignId: string;
+  businessId: string;
+  priceVersion: 'v1';
+  currency: 'INR';
+  baseFeePaise: number;
+  perVoucherFeePaise: number;
+  quantity: number;
+  totalPaise: number;
+  status: 'issued' | 'paid';
+  issuedAt: Date;
+  paidAt?: Date;
+  externalPaymentReference?: string;
+  externalPaymentDate?: Date;
+}
+
+export interface CampaignWorkspace {
+  campaign: Campaign;
+  inventoryCount: number;
+  invoice: Invoice | null;
+  analytics: CampaignAnalytics | null;
+}
+
+export type CampaignSummary = CampaignWorkspace;
+
+export interface CampaignInventoryCandidate {
+  sourceRow: number;
+  code: string;
+  value?: string;
+}
+
+export interface CampaignInventoryRejectedRow extends CampaignInventoryCandidate {
+  reason: string;
+}
+
+export interface CampaignInventoryPreview {
+  accepted: CampaignInventoryCandidate[];
+  rejected: CampaignInventoryRejectedRow[];
+  totalRows: number;
+}
+
+export interface SettlementInput {
+  amountPaise: number;
+  externalPaymentReference: string;
+  externalPaymentDate: string;
 }
 
 export interface UserFavorite {
