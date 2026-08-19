@@ -52,12 +52,12 @@ router.post('/signup', asyncRoute(async (req, res) => {
   const user = await withTransaction(async (session) => {
     let createdUser;
     try {
-      createdUser = await User.create({
+      [createdUser] = await User.create([{
         email: input.email,
         username: input.username,
         role: input.role,
         passwordHash: await hashPassword(input.password),
-      }, { session });
+      }], { session });
     } catch (error) {
       if ((error as { code?: number }).code === 11000) {
         throw new ApiError(409, 'An account with this email already exists');
@@ -66,12 +66,12 @@ router.post('/signup', asyncRoute(async (req, res) => {
     }
 
     if (input.role === 'business') {
-      await BusinessProfile.create({
+      await BusinessProfile.create([{
         userId: createdUser._id,
         organizationName: input.organizationName,
         contactName: input.contactName,
         website: input.website,
-      }, { session });
+      }], { session });
     }
 
     return createdUser;

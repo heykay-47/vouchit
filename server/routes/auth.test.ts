@@ -23,14 +23,15 @@ vi.mock('../models/User', () => ({
     findById: vi.fn(async (id: string) => {
       return Array.from(users.values()).find((user) => user._id.toString() === id) ?? null;
     }),
-    create: vi.fn(async (doc: any, _options?: { session?: object }) => {
+    create: vi.fn(async (docs: any, _options?: { session?: object }) => {
+      const doc = Array.isArray(docs) ? docs[0] : docs;
       const user = {
         _id: { toString: () => '507f1f77bcf86cd799439011' },
         ...doc,
         createdAt: new Date('2026-05-20T00:00:00.000Z'),
       };
       users.set(doc.email, user);
-      return user;
+      return Array.isArray(docs) ? [user] : user;
     }),
   },
 }));vi.mock('../models/Favorite', () => ({
@@ -159,17 +160,17 @@ describe('auth routes', () => {
 
     expect(response.body.data.user.role).toBe('business');
     expect(User.create).toHaveBeenCalledWith(
-      expect.objectContaining({ email: 'ops@example.com', role: 'business' }),
+      [expect.objectContaining({ email: 'ops@example.com', role: 'business' })],
       { session: transactionSession },
     );
     expect(BusinessProfile.create).toHaveBeenCalledOnce();
     expect(BusinessProfile.create).toHaveBeenCalledWith(
-      expect.objectContaining({
+      [expect.objectContaining({
         userId: expect.anything(),
         organizationName: 'Acme Offers',
         contactName: 'Asha Rao',
         website: 'https://acme.example',
-      }),
+      })],
       { session: transactionSession },
     );
     expect(response.headers['set-cookie'][0]).toContain('auth_token=');
