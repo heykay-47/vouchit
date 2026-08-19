@@ -289,6 +289,27 @@ export const buildDemoFixtures = (now = new Date()) => {
   };
 };
 
+export const buildDemoReconciliationPlan = (fixtures) => ({
+  seededUserKeys: fixtures.users.map((user) => user.seedKey),
+  seededCampaignKeys: fixtures.campaigns.map((campaign) => campaign.seedKey),
+  redeemedVoucherCodes: fixtures.vouchers
+    .filter((voucher) => voucher.isRedeemed)
+    .map((voucher) => voucher.code),
+  unredeemedVoucherCodes: fixtures.vouchers
+    .filter((voucher) => !voucher.isRedeemed)
+    .map((voucher) => voucher.code),
+  campaignVoucherKeys: fixtures.vouchers
+    .filter((voucher) => voucher.campaignKey !== undefined)
+    .map((voucher) => ({ campaignKey: voucher.campaignKey, code: voucher.code })),
+});
+
+export const findStaleCampaignVoucherKeys = (existingVouchers, plan) => existingVouchers.filter((voucher) => (
+  plan.seededCampaignKeys.includes(voucher.campaignKey)
+  && !plan.campaignVoucherKeys.some((key) => (
+    key.campaignKey === voucher.campaignKey && key.code === voucher.code
+  ))
+));
+
 const loadLocalEnv = () => {
   if (!fs.existsSync('.env')) return;
 
@@ -331,6 +352,7 @@ const businessProfileSchema = new mongoose.Schema({
   contactName: { type: String, required: true, trim: true },
   website: { type: String, trim: true },
 }, { timestamps: true });
+businessProfileSchema.index({ userId: 1 }, { unique: true });
 
 const campaignSchema = new mongoose.Schema({
   businessId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -346,6 +368,8 @@ const campaignSchema = new mongoose.Schema({
   status: { type: String, enum: ['draft', 'awaiting_payment', 'active', 'completed'], required: true },
   lockedAt: { type: Date, default: null },
 }, { timestamps: true });
+campaignSchema.index({ businessId: 1 });
+campaignSchema.index({ status: 1 });
 
 const invoiceSchema = new mongoose.Schema({
   campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', required: true },
@@ -362,6 +386,14 @@ const invoiceSchema = new mongoose.Schema({
   externalPaymentReference: { type: String, default: null },
   externalPaymentDate: { type: Date, default: null },
 }, { timestamps: true });
+invoiceSchema.index({ campaignId: 1 }, { unique: true });
+invoiceSchema.index(
+  { businessId: 1, externalPaymentReference: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { externalPaymentReference: { $type: 'string' } },
+  },
+);
 
 const voucherSchema = new mongoose.Schema(
   {
@@ -386,6 +418,12 @@ const voucherSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+voucherSchema.index({ isActive: 1, isRedeemed: 1, donatedAt: -1 });
+voucherSchema.index({ donatedBy: 1 });
+voucherSchema.index(
+  { campaignId: 1, code: 1 },
+  { unique: true, partialFilterExpression: { sourceType: 'campaign' } },
+);
 
 const voucherRequestSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -395,6 +433,7 @@ const voucherRequestSchema = new mongoose.Schema({
   responses: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },
 }, { timestamps: { createdAt: 'createdAt', updatedAt: true } });
+voucherRequestSchema.index({ createdAt: -1 });
 
 const activitySchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -404,12 +443,14 @@ const activitySchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
 }, { timestamps: { createdAt: 'createdAt', updatedAt: false } });
+activitySchema.index({ createdAt: -1 });
 
 const commentSchema = new mongoose.Schema({
   voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', required: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   text: { type: String, required: true, trim: true, maxlength: 1000 },
 }, { timestamps: { createdAt: 'createdAt', updatedAt: false } });
+commentSchema.index({ voucherId: 1, createdAt: 1 });
 
 const notificationSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -419,17 +460,27 @@ const notificationSchema = new mongoose.Schema({
   voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', default: null },
   isRead: { type: Boolean, default: false },
 }, { timestamps: { createdAt: 'createdAt', updatedAt: false } });
+notificationSchema.index({ userId: 1, createdAt: -1 });
 
 const favoriteSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', required: true },
 }, { timestamps: { createdAt: 'createdAt', updatedAt: false } });
+favoriteSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
 const redeemedVoucherSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', required: true },
   redeemedAt: { type: Date, required: true },
 }, { timestamps: false });
+redeemedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
+
+const reportedVoucherSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', required: true },
+  reportedAt: { type: Date, default: Date.now },
+}, { timestamps: false });
+reportedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 const BusinessProfile = mongoose.models.BusinessProfile || mongoose.model('BusinessProfile', businessProfileSchema);
@@ -442,6 +493,7 @@ const Comment = mongoose.models.Comment || mongoose.model('Comment', commentSche
 const Notification = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
 const Favorite = mongoose.models.Favorite || mongoose.model('Favorite', favoriteSchema);
 const RedeemedVoucher = mongoose.models.RedeemedVoucher || mongoose.model('RedeemedVoucher', redeemedVoucherSchema);
+const ReportedVoucher = mongoose.models.ReportedVoucher || mongoose.model('ReportedVoucher', reportedVoucherSchema);
 
 const userUpdate = (user, passwordHash) => ({
   email: user.email,
@@ -526,6 +578,45 @@ const run = async () => {
     );
   }
 
+  const reconciliationPlan = buildDemoReconciliationPlan(fixtures);
+  const campaignIds = Object.values(campaigns).map((campaign) => campaign._id);
+  const campaignKeyById = new Map(
+    Object.entries(campaigns).map(([campaignKey, campaign]) => [String(campaign._id), campaignKey]),
+  );
+  const existingCampaignVouchers = await Voucher.find(
+    { sourceType: 'campaign', campaignId: { $in: campaignIds } },
+    { _id: 1, campaignId: 1, code: 1 },
+  ).lean();
+  const staleCampaignVouchers = findStaleCampaignVoucherKeys(
+    existingCampaignVouchers
+      .map((voucher) => ({
+        _id: voucher._id,
+        campaignKey: campaignKeyById.get(String(voucher.campaignId)),
+        code: voucher.code,
+      })),
+    reconciliationPlan,
+  );
+  const staleCampaignVoucherIds = staleCampaignVouchers.map((voucher) => voucher._id);
+
+  if (staleCampaignVoucherIds.length > 0) {
+    await Promise.all([
+      Voucher.deleteMany({
+        _id: { $in: staleCampaignVoucherIds },
+        sourceType: 'campaign',
+        campaignId: { $in: campaignIds },
+      }),
+      RedeemedVoucher.deleteMany({ voucherId: { $in: staleCampaignVoucherIds } }),
+      Favorite.deleteMany({ voucherId: { $in: staleCampaignVoucherIds } }),
+      Comment.deleteMany({ voucherId: { $in: staleCampaignVoucherIds } }),
+      Notification.deleteMany({ voucherId: { $in: staleCampaignVoucherIds } }),
+      ReportedVoucher.deleteMany({ voucherId: { $in: staleCampaignVoucherIds } }),
+      Activity.deleteMany({
+        entityId: { $in: staleCampaignVoucherIds },
+        entityType: 'voucher',
+      }),
+    ]);
+  }
+
   for (const fixture of fixtures.vouchers) {
     const isCampaignVoucher = fixture.campaignKey !== undefined;
     const campaignId = isCampaignVoucher ? campaigns[fixture.campaignKey]._id : null;
@@ -555,6 +646,17 @@ const run = async () => {
       ? { campaignId, code: fixture.code }
       : { code: fixture.code };
     vouchers[fixture.code] = await upsertFixture(Voucher, filter, voucherData);
+  }
+
+  const seededUserIds = Object.values(users).map((user) => user._id);
+  const unredeemedVoucherIds = fixtures.vouchers
+    .filter((fixture) => !fixture.isRedeemed)
+    .map((fixture) => vouchers[fixture.code]._id);
+  if (unredeemedVoucherIds.length > 0) {
+    await RedeemedVoucher.deleteMany({
+      voucherId: { $in: unredeemedVoucherIds },
+      userId: { $in: seededUserIds },
+    });
   }
 
   for (const fixture of fixtures.invoices) {

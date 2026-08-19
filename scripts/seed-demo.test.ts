@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildDemoFixtures } from './seed-demo.mjs';
+import {
+  buildDemoFixtures,
+  buildDemoReconciliationPlan,
+  findStaleCampaignVoucherKeys,
+} from './seed-demo.mjs';
 
 const fixedNow = new Date('2026-08-19T12:00:00.000Z');
 
@@ -45,5 +49,38 @@ describe('demo seed fixtures', () => {
         isRedeemed: true,
       }),
     ]));
+  });
+
+  it('plans scoped redemption cleanup from the fixture voucher state', () => {
+    const fixtures = buildDemoFixtures(fixedNow);
+    const plan = buildDemoReconciliationPlan(fixtures);
+
+    expect(plan.unredeemedVoucherCodes).toEqual(expect.arrayContaining([
+      'COFFEE-REMAINING-01',
+      'GPLAY20-DEMO',
+    ]));
+    expect(plan.redeemedVoucherCodes).toEqual(expect.arrayContaining([
+      'COFFEE-CLAIMED-DEMO',
+      'WEEKENDSTAY-DEMO',
+    ]));
+    expect(plan.seededUserKeys).toEqual([
+      'customer-user',
+      'business-user',
+      'maya-user',
+      'arjun-user',
+    ]);
+  });
+
+  it('finds only stale vouchers inside seeded campaign inventory', () => {
+    const fixtures = buildDemoFixtures(fixedNow);
+    const plan = buildDemoReconciliationPlan(fixtures);
+
+    expect(findStaleCampaignVoucherKeys([
+      { campaignKey: 'active-campaign', code: 'COFFEE-REMAINING-01' },
+      { campaignKey: 'active-campaign', code: 'STALE-CODE' },
+      { campaignKey: 'unrelated-campaign', code: 'DO-NOT-DELETE' },
+    ], plan)).toEqual([
+      { campaignKey: 'active-campaign', code: 'STALE-CODE' },
+    ]);
   });
 });

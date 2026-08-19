@@ -41,3 +41,31 @@ Implemented Task 18 on branch `b2b-b2c-marketplace` in the isolated worktree. Th
 
 - Live database idempotence was not exercised because the task explicitly prohibits running the seed against a database. The fixture and syntax tests cover import safety and internal consistency; a disposable database smoke test remains the natural deployment follow-up.
 - Lint retains the repository baseline of 151 warnings, with no errors and no new warning in the changed TypeScript or documentation files.
+
+## Fix Round 1
+
+### Findings Addressed
+
+- Reconciled `RedeemedVoucher` history for the seeded voucher set: fixture-unredeemed vouchers remove history only for seeded demo users, while fixture-redeemed vouchers are upserted for their fixture claimant.
+- Reconciled seeded campaign inventory by querying only campaign vouchers belonging to the seeded campaign IDs, deleting natural keys absent from the current fixture, and removing dependent redemption, favorite, comment, notification, report, and activity references by stale voucher ID.
+- Kept invoice quantity and total derived from the current fixture inventory and continued writing campaign status, expiry, and lock fields explicitly on every rerun.
+- Mirrored the inspected runtime uniqueness and query indexes in the duplicate seed schemas: user email, business profile user, invoice campaign and payment reference, campaign voucher `{ campaignId, code }`, redemption/favorite/report pairs, and supporting query indexes. No new campaign identity uniqueness constraint was invented because the runtime model has none.
+
+### TDD Evidence
+
+- RED: new reconciliation tests failed because `buildDemoReconciliationPlan` was not exported and no stale-key helper existed.
+- GREEN: focused seed tests passed after adding `buildDemoReconciliationPlan` and `findStaleCampaignVoucherKeys`, then runtime reconciliation was wired to those helpers.
+
+### Fix Round Verification
+
+- `node --check scripts/seed-demo.mjs`: PASS
+- `npm test -- scripts/seed-demo.test.ts`: PASS, 4 tests
+- `npm test`: PASS, 53 files and 324 tests
+- `npm run type-check`: PASS
+- `npm run lint`: PASS, 0 errors and 151 existing warnings
+- `npm run build`: PASS
+- Seed execution against MongoDB: intentionally not run
+
+### Fix Round Concerns
+
+- Live database reconciliation and index creation were not exercised because the task prohibits running the seed against a database. Pure reconciliation tests prove seeded scope and stale-key selection; a disposable database smoke test remains the deployment follow-up.
