@@ -6,12 +6,14 @@ import {
   previewCampaignInventory,
   type CampaignInventoryCandidate,
 } from '../lib/campaign-inventory.js';
+import { quoteCampaign } from '../lib/campaign-pricing.js';
 import { toCampaignResponse } from '../lib/business-serializers.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { withTransaction } from '../lib/transaction.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { BusinessProfile, type BusinessProfileDocument } from '../models/BusinessProfile.js';
 import { Campaign, type CampaignDocument } from '../models/Campaign.js';
+import { Invoice, type InvoiceDocument } from '../models/Invoice.js';
 import { Voucher } from '../models/Voucher.js';
 
 const router = Router();
@@ -142,6 +144,29 @@ const draftCampaignFilter = (
   status: 'draft',
   lockedAt: null,
 });
+
+const toInvoiceResponse = (invoice: InvoiceDocument) => ({
+  id: idFor(invoice._id),
+  campaignId: idFor(invoice.campaignId),
+  businessId: idFor(invoice.businessId),
+  priceVersion: invoice.priceVersion,
+  currency: invoice.currency,
+  baseFeePaise: invoice.baseFeePaise,
+  perVoucherFeePaise: invoice.perVoucherFeePaise,
+  quantity: invoice.quantity,
+  totalPaise: invoice.totalPaise,
+  status: invoice.status,
+  issuedAt: invoice.issuedAt,
+  ...(invoice.paidAt ? { paidAt: invoice.paidAt } : {}),
+  ...(invoice.externalPaymentReference ? { externalPaymentReference: invoice.externalPaymentReference } : {}),
+  ...(invoice.externalPaymentDate ? { externalPaymentDate: invoice.externalPaymentDate } : {}),
+});
+
+const isDuplicateKeyError = (error: unknown) => (
+  typeof error === 'object'
+  && error !== null
+  && (error as { code?: number }).code === 11000
+);
 
 router.use(requireAuth, requireRole('business'));
 
@@ -278,6 +303,73 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
   });
 
   ok(res, { campaign: await campaignWorkspace(result.campaign, result.profile) });
+}));
+
+router.post('/campaigns/:id/invoice', asyncRoute(async (req, res) => {
+  const authedReq = req as AuthedRequest;
+  await requireOwnedCampaign(authedReq);
+
+  const campaignId = req.params.id;
+  const businessId = userIdFrom(authedReq);
+  let result: { invoice: InvoiceDocument; created: boolean };
+
+  try {
+    result = await withTransaction(async (session) => {
+      const campaign = await Campaign.findOne(
+        { _id: campaignId, businessId },
+        null,
+        { session },
+      );
+      if (!campaign) {
+        throw new ApiError(404, 'Campaign not found');
+      }
+
+      const existing = await Invoice.findOne(
+        { campaignId, businessId },
+        null,
+        { session },
+      );
+      if (existing) {
+        return { invoice: existing, created: false };
+      }
+
+      requireDraft(campaign);
+      const quantity = await Voucher.countDocuments(
+        { campaignId, sourceType: 'campaign' },
+        { session },
+      );
+      if (quantity === 0) {
+        throw new ApiError(409, 'Campaign inventory is required');
+      }
+
+      const invoice = (await Invoice.create([
+        { campaignId, businessId, ...quoteCampaign(quantity) },
+      ], { session }))[0];
+      const lockedAt = new Date();
+      const lockedCampaign = await Campaign.findOneAndUpdate(
+        { _id: campaignId, businessId, status: 'draft', lockedAt: null },
+        { $set: { status: 'awaiting_payment', lockedAt } },
+        { new: true, session },
+      );
+      if (!lockedCampaign) {
+        throw new ApiError(409, 'Campaign is locked');
+      }
+
+      return { invoice, created: true };
+    });
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    const winner = await Invoice.findOne({ campaignId, businessId });
+    if (!winner) {
+      throw error;
+    }
+    result = { invoice: winner, created: false };
+  }
+
+  ok(res, { invoice: toInvoiceResponse(result.invoice) }, result.created ? 201 : 200);
 }));
 
 export { router as businessRouter };

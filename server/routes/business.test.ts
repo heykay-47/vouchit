@@ -5,6 +5,7 @@ import { signAuthToken } from '../lib/token.js';
 import { withTransaction } from '../lib/transaction.js';
 import { BusinessProfile } from '../models/BusinessProfile.js';
 import { Campaign } from '../models/Campaign.js';
+import { Invoice } from '../models/Invoice.js';
 import { Voucher } from '../models/Voucher.js';
 
 const businessId = '507f1f77bcf86cd799439011';
@@ -15,8 +16,10 @@ const campaignId = '507f1f77bcf86cd799439013';
 const session = { id: 'transaction-session' };
 const campaigns: Record<string, unknown>[] = [];
 const vouchers: Record<string, unknown>[] = [];
+const invoices: Record<string, unknown>[] = [];
 const organizationName = 'Fresh Market Ltd';
 let businessProfile: Record<string, unknown> | null;
+let duplicateInvoiceOnCreate = false;
 
 const chain = (value: unknown) => {
   const query = {
@@ -55,6 +58,10 @@ vi.mock('../models/Campaign', () => ({
   Campaign: {
     find: vi.fn((query: Record<string, unknown>) => chain(campaigns.filter((campaign) => String(campaign.businessId) === String(query.businessId)))),
     findById: vi.fn(async (id: string) => campaigns.find((campaign) => String(campaign._id) === id) ?? null),
+    findOne: vi.fn(async (query: Record<string, unknown>) => campaigns.find((campaign) => (
+      String(campaign._id) === String(query._id)
+      && String(campaign.businessId) === String(query.businessId)
+    )) ?? null),
     create: vi.fn(async (doc: Record<string, unknown>) => {
       const campaign = {
         _id: { toString: () => campaignId },
@@ -98,6 +105,29 @@ vi.mock('../models/Voucher', () => ({
     }),
   },
 }));
+vi.mock('../models/Invoice', () => ({
+  Invoice: {
+    findOne: vi.fn(async (query: Record<string, unknown>) => invoices.find((invoice) => (
+      String(invoice.campaignId) === String(query.campaignId)
+      && String(invoice.businessId) === String(query.businessId)
+    )) ?? null),
+    create: vi.fn(async (docs: Record<string, unknown>[]) => {
+      if (duplicateInvoiceOnCreate) {
+        const error = Object.assign(new Error('duplicate invoice'), { code: 11000 });
+        throw error;
+      }
+
+      const created = docs.map((doc) => ({
+        _id: { toString: () => '507f1f77bcf86cd799439030' },
+        issuedAt: new Date('2026-08-19T00:00:00.000Z'),
+        status: 'issued',
+        ...doc,
+      }));
+      invoices.push(...created);
+      return created;
+    }),
+  },
+}));
 
 const tokenFor = (id = businessId) => signAuthToken({ userId: id }, '1h');
 
@@ -134,6 +164,8 @@ describe('business routes', () => {
     process.env.JWT_SECRET = 'test-secret';
     campaigns.length = 0;
     vouchers.length = 0;
+    invoices.length = 0;
+    duplicateInvoiceOnCreate = false;
     businessProfile = { _id: profileId, userId: businessId, organizationName };
     vi.clearAllMocks();
   });
@@ -515,5 +547,117 @@ describe('business routes', () => {
     } finally {
       stderrWrite.mockRestore();
     }
+  });
+
+  it('rejects invoice issuance for an owned campaign without persisted inventory', async () => {
+    seedCampaign();
+
+    const response = await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(409);
+
+    expect(response.body.error).toEqual({ message: 'Campaign inventory is required' });
+    expect(invoices).toHaveLength(0);
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects invoice issuance for a campaign owned by another business', async () => {
+    seedCampaign({ businessId: otherBusinessId });
+
+    await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(403);
+
+    expect(invoices).toHaveLength(0);
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  it('issues an immutable inventory snapshot and locks the campaign', async () => {
+    const campaign = seedCampaign();
+    vouchers.push(
+      { campaignId, sourceType: 'campaign', code: 'SAVE10' },
+      { campaignId, sourceType: 'campaign', code: 'SHIPFREE' },
+      { campaignId, sourceType: 'campaign', code: 'WELCOME' },
+    );
+
+    const response = await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(201);
+
+    expect(response.body.data.invoice).toMatchObject({
+      id: '507f1f77bcf86cd799439030',
+      campaignId,
+      businessId,
+      priceVersion: 'v1',
+      currency: 'INR',
+      baseFeePaise: 9900,
+      perVoucherFeePaise: 200,
+      quantity: 3,
+      totalPaise: 10500,
+      status: 'issued',
+    });
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: campaignId, businessId, status: 'draft', lockedAt: null },
+      { $set: { status: 'awaiting_payment', lockedAt: expect.any(Date) } },
+      { new: true, session },
+    );
+    expect(campaign.status).toBe('awaiting_payment');
+    expect(campaign.lockedAt).toBeInstanceOf(Date);
+    expect(Invoice.create).toHaveBeenCalledWith([
+      expect.objectContaining({ campaignId, businessId, quantity: 3, totalPaise: 10500 }),
+    ], { session });
+  });
+
+  it('returns the same invoice when issuance is repeated after locking', async () => {
+    seedCampaign();
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10' });
+
+    const first = await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(201);
+    const second = await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(second.body.data.invoice).toEqual(first.body.data.invoice);
+    expect(Invoice.create).toHaveBeenCalledOnce();
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledOnce();
+  });
+
+  it('returns the winning invoice after a concurrent duplicate campaign insert', async () => {
+    seedCampaign({ status: 'draft', lockedAt: null });
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10' });
+    const winner = {
+      _id: { toString: () => '507f1f77bcf86cd799439031' },
+      campaignId,
+      businessId,
+      priceVersion: 'v1',
+      currency: 'INR',
+      baseFeePaise: 9900,
+      perVoucherFeePaise: 200,
+      quantity: 1,
+      totalPaise: 10100,
+      status: 'issued',
+      issuedAt: new Date('2026-08-19T00:00:00.000Z'),
+    };
+    duplicateInvoiceOnCreate = true;
+    vi.mocked(Invoice.findOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(winner as never);
+
+    const response = await request(createApp())
+      .post(`/api/business/campaigns/${campaignId}/invoice`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(response.body.data.invoice.id).toBe('507f1f77bcf86cd799439031');
+    expect(response.body.data.invoice.totalPaise).toBe(10100);
+    expect(campaigns[0].status).toBe('draft');
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import { Favorite } from './Favorite.js';
 import { ReportedVoucher } from './ReportedVoucher.js';
 import { BusinessProfile } from './BusinessProfile.js';
 import { Campaign } from './Campaign.js';
+import { Invoice } from './Invoice.js';
 
 describe('mongoose models', () => {
   it('defines core collection names', () => {
@@ -13,6 +14,7 @@ describe('mongoose models', () => {
     expect(Favorite.collection.name).toBe('favorites');
     expect(ReportedVoucher.collection.name).toBe('reportedvouchers');
     expect(Campaign.collection.name).toBe('campaigns');
+    expect(Invoice.collection.name).toBe('invoices');
   });
 
   it('sets voucher defaults', () => {
@@ -121,6 +123,46 @@ describe('mongoose models', () => {
     const indexes = BusinessProfile.schema.indexes();
     expect(indexes).toEqual(expect.arrayContaining([
       [{ userId: 1 }, expect.objectContaining({ unique: true })],
+    ]));
+  });
+
+  it('defines immutable invoice pricing snapshots', () => {
+    const invoice = new Invoice({
+      campaignId: '507f1f77bcf86cd799439013',
+      businessId: '507f1f77bcf86cd799439011',
+      priceVersion: 'v1',
+      currency: 'INR',
+      baseFeePaise: 9900,
+      perVoucherFeePaise: 200,
+      quantity: 3,
+      totalPaise: 10500,
+    });
+
+    expect(invoice.validateSync()).toBeUndefined();
+    expect(invoice.status).toBe('issued');
+    expect(invoice.issuedAt).toBeInstanceOf(Date);
+    expect(Invoice.schema.path('campaignId').options.immutable).toBe(true);
+    expect(Invoice.schema.path('businessId').options.immutable).toBe(true);
+    expect(Invoice.schema.path('priceVersion').options.immutable).toBe(true);
+    expect(Invoice.schema.path('currency').options.immutable).toBe(true);
+    expect(Invoice.schema.path('baseFeePaise').options.immutable).toBe(true);
+    expect(Invoice.schema.path('perVoucherFeePaise').options.immutable).toBe(true);
+    expect(Invoice.schema.path('quantity').options.immutable).toBe(true);
+    expect(Invoice.schema.path('totalPaise').options.immutable).toBe(true);
+  });
+
+  it('indexes invoices uniquely by campaign and external reference per business', () => {
+    const indexes = Invoice.schema.indexes();
+
+    expect(indexes).toEqual(expect.arrayContaining([
+      [{ campaignId: 1 }, expect.objectContaining({ unique: true })],
+      [
+        { businessId: 1, externalPaymentReference: 1 },
+        expect.objectContaining({
+          unique: true,
+          partialFilterExpression: { externalPaymentReference: { $type: 'string' } },
+        }),
+      ],
     ]));
   });
 });
