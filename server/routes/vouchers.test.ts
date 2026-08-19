@@ -30,6 +30,7 @@ const matchesFilter = (document: any, filter: any): boolean => Object.entries(fi
 });
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
+vi.mock('express-rate-limit', () => ({ default: () => (_req: any, _res: any, next: any) => next() }));
 vi.mock('../models/Activity', () => ({ Activity: { create: vi.fn(async () => ({})) } }));
 vi.mock('../models/Voucher', () => {
   let query: any = {};
@@ -507,6 +508,50 @@ describe('voucher routes', () => {
       .expect(200);
 
     expect(res.body.data.vouchers).toEqual([]);
+  });
+
+  it('returns a claimed campaign voucher only to its claiming customer', async () => {
+    const ownerId = '507f1f77bcf86cd799439099';
+    const customerId = '507f1f77bcf86cd799439022';
+    const campaignId = { toString: () => '507f1f77bcf86cd799439013' };
+    campaigns.push({
+      _id: campaignId,
+      businessId: ownerId,
+      status: 'completed',
+      expiryDate: new Date('2026-08-18T00:00:00.000Z'),
+    });
+    vouchers.push({
+      _id: { toString: () => '507f1f77bcf86cd799439016' },
+      sourceType: 'campaign',
+      campaignId,
+      donatedBy: ownerId,
+      redeemedBy: customerId,
+      code: 'CLAIMED-CAMPAIGN-CODE',
+      isActive: true,
+      isRedeemed: true,
+      expiryDate: new Date('2026-08-18T00:00:00.000Z'),
+    });
+
+    const bystanderResponse = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: '507f1f77bcf86cd799439023' }, '1h')}`])
+      .expect(200);
+    const ownerResponse = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: ownerId }, '1h')}`])
+      .expect(200);
+    const customerResponse = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: customerId }, '1h')}`])
+      .expect(200);
+
+    expect(bystanderResponse.body.data.vouchers).toEqual([]);
+    expect(ownerResponse.body.data.vouchers).toEqual([]);
+    expect(customerResponse.body.data.vouchers).toMatchObject([{
+      id: '507f1f77bcf86cd799439016',
+      code: 'CLAIMED-CAMPAIGN-CODE',
+      redeemedBy: customerId,
+    }]);
   });
 
   it('rejects a stale campaign voucher claim using the atomic expiry predicate', async () => {

@@ -55,6 +55,7 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
           publicFilter,
           { $and: [communityHistoryFilter, { donatedBy: viewerId }] },
           { $and: [communityHistoryFilter, { redeemedBy: viewerId }] },
+          { sourceType: 'campaign', redeemedBy: viewerId },
         ],
       }
     : publicFilter;
