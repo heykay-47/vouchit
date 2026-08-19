@@ -3,8 +3,11 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
+import { publicVoucherFilter, toVoucherResponse, voucherAvailabilityFilter } from '../lib/voucher-serializer.js';
 import { getOptionalUserId, optionalAuth, requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
+import { BusinessProfile } from '../models/BusinessProfile.js';
+import { Campaign } from '../models/Campaign.js';
 import { Comment } from '../models/Comment.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
 import { ReportedVoucher } from '../models/ReportedVoucher.js';
@@ -32,50 +35,49 @@ const listSchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-const toVoucherResponse = (voucher: any, viewerId?: string) => {
-  const donatedBy = voucher.donatedBy?.toString?.() ?? String(voucher.donatedBy);
-  const redeemedBy = voucher.redeemedBy?.toString?.() ?? undefined;
-  const canViewCode = !!viewerId && (donatedBy === viewerId || redeemedBy === viewerId);
-  return {
-    id: voucher._id.toString(),
-    platform: voucher.platform,
-    title: voucher.title,
-    description: voucher.description,
-    ...(canViewCode ? { code: voucher.code } : {}),
-    imageUrl: voucher.imageUrl,
-    expiryDate: voucher.expiryDate ?? undefined,
-    value: voucher.value ?? undefined,
-    donatedBy,
-    donatedAt: voucher.donatedAt,
-    isRedeemed: voucher.isRedeemed,
-    redeemedBy,
-    redeemedAt: voucher.redeemedAt ?? undefined,
-    reportCount: voucher.reportCount,
-    isActive: voucher.isActive,
-    category: voucher.category ?? undefined,
-  };
-};
-
 router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   await connectDb();
   const { limit, offset } = listSchema.parse(req.query);
   const viewerId = getOptionalUserId(req);
+  const now = new Date();
+  const activeCampaigns = await Campaign.find({ status: 'active', expiryDate: { $gt: now } }).lean();
+  const activeCampaignIds = activeCampaigns.map((campaign: any) => campaign._id.toString());
+  const publicFilter = publicVoucherFilter(activeCampaignIds, now);
   const query = viewerId
-    ? {
-        $or: [
-          { isActive: true, isRedeemed: false },
-          { donatedBy: viewerId },
-          { redeemedBy: viewerId },
-        ],
-      }
-    : { isActive: true, isRedeemed: false };
+    ? { $or: [publicFilter, { donatedBy: viewerId }, { redeemedBy: viewerId }] }
+    : publicFilter;
   const vouchers = await Voucher
     .find(query)
     .sort({ donatedAt: -1 })
     .skip(offset)
     .limit(limit)
     .lean();
-  ok(res, { vouchers: vouchers.map((voucher) => toVoucherResponse(voucher, viewerId)) });
+  const referencedCampaignIds = [...new Set(vouchers
+    .filter((voucher: any) => voucher.sourceType === 'campaign' && voucher.campaignId)
+    .map((voucher: any) => voucher.campaignId.toString()))];
+  const missingCampaignIds = referencedCampaignIds.filter((id) => !activeCampaignIds.includes(id));
+  const historicalCampaigns = missingCampaignIds.length > 0
+    ? await Campaign.find({ _id: { $in: missingCampaignIds } }).lean()
+    : [];
+  const campaignMap = new Map<string, any>([...activeCampaigns, ...historicalCampaigns]
+    .map((campaign: any) => [campaign._id.toString(), campaign]));
+  const profileIds = [...new Set([...campaignMap.values()]
+    .filter((campaign) => campaign.businessProfileId)
+    .map((campaign) => campaign.businessProfileId.toString()))];
+  const profiles = profileIds.length > 0
+    ? await BusinessProfile.find({ _id: { $in: profileIds } }).lean()
+    : [];
+  const profileMap = new Map<string, any>(profiles.map((profile: any) => [profile._id.toString(), profile]));
+
+  ok(res, {
+    vouchers: vouchers.map((voucher: any) => {
+      const campaign = voucher.campaignId ? campaignMap.get(voucher.campaignId.toString()) : undefined;
+      const profile = campaign?.businessProfileId
+        ? profileMap.get(campaign.businessProfileId.toString())
+        : undefined;
+      return toVoucherResponse(voucher, viewerId, { campaign, profile });
+    }),
+  });
 }));
 
 router.post('/', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
@@ -113,7 +115,7 @@ router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(asyn
   }
 
   const voucher = await Voucher.findOneAndUpdate(
-    { _id: voucherId, isActive: true, isRedeemed: false, donatedBy: { $ne: userId } },
+    { _id: voucherId, ...voucherAvailabilityFilter(), donatedBy: { $ne: userId } },
     { isRedeemed: true, redeemedBy: userId, redeemedAt: new Date() },
     { new: true }
   );
@@ -123,6 +125,19 @@ router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(asyn
   }
 
   await RedeemedVoucher.create({ userId, voucherId }).catch(() => undefined);
+  if (voucher.sourceType === 'campaign' && voucher.campaignId) {
+    const remaining = await Voucher.exists({
+      campaignId: voucher.campaignId,
+      sourceType: 'campaign',
+      isRedeemed: false,
+    });
+    if (!remaining) {
+      await Campaign.findOneAndUpdate(
+        { _id: voucher.campaignId, status: 'active' },
+        { $set: { status: 'completed' } },
+      );
+    }
+  }
   ok(res, { voucher: toVoucherResponse(voucher, userId), message: 'Voucher redeemed successfully' });
 }));
 

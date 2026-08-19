@@ -114,7 +114,13 @@ router.patch('/notifications/:id/read', requireAuth, asyncRoute(async (req, res)
 router.get('/leaderboard', asyncRoute(async (_req, res) => {
   await connectDb();
   const rows = await Voucher.aggregate([
-    { $match: { isActive: true, isRedeemed: false } },
+    {
+      $match: {
+        isActive: true,
+        isRedeemed: false,
+        $or: [{ sourceType: 'community' }, { sourceType: { $exists: false } }],
+      },
+    },
     { $group: { _id: '$donatedBy', donationCount: { $sum: 1 }, totalDonated: { $sum: 1 } } },
     { $sort: { donationCount: -1 } },
     { $limit: 10 },

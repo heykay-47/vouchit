@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 import { User } from '../models/User.js';
+import { Voucher } from '../models/Voucher.js';
 
 const requests: any[] = [];
 const activities: any[] = [];
@@ -190,5 +191,20 @@ describe('community routes', () => {
     const res = await request(createApp()).get('/api/activities').expect(200);
 
     expect(res.body.data.activities[0].username).toBe('Anonymous');
+  });
+
+  it('restricts leaderboard inventory to community and legacy vouchers', async () => {
+    await request(createApp()).get('/api/leaderboard').expect(200);
+
+    expect(Voucher.aggregate).toHaveBeenCalledWith(expect.arrayContaining([
+      {
+        $match: expect.objectContaining({
+          $or: [
+            { sourceType: 'community' },
+            { sourceType: { $exists: false } },
+          ],
+        }),
+      },
+    ]));
   });
 });
