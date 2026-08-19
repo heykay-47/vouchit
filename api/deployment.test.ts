@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('Vercel deployment configuration', () => {
   it('exports the Express app directly for Vercel', async () => {
-    const entrypoint = await import('./[...path]');
+    const entrypoint = await import('./[...path].js');
 
     expect(entrypoint.default).toHaveProperty('handle');
   });

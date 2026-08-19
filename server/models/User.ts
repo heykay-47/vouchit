@@ -15,6 +15,7 @@ const userSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     username: { type: String, required: true, trim: true, minlength: 3, maxlength: 50 },
+    role: { type: String, enum: ['customer', 'business'], default: 'customer' },
     bio: { type: String, default: null },
     profileImage: { type: String, default: null },
     notificationPreferences: { type: notificationPreferencesSchema, default: () => ({}) },

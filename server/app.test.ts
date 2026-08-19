@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createApp } from './app';
+import { createApp } from './app.js';
 
 describe('createApp', () => {
   afterEach(() => {

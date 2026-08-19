@@ -21,7 +21,7 @@ describe('connectDb', () => {
       .mockRejectedValueOnce(new Error('network down'))
       .mockResolvedValueOnce(mongoose);
 
-    const { connectDb } = await import('./db');
+    const { connectDb } = await import('./db.js');
 
     await expect(connectDb()).rejects.toThrow('network down');
     await expect(connectDb()).resolves.toBe(mongoose);

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../app';
+import { createApp } from '../app.js';
 
 const users = new Map<string, any>();
 const favorites: any[] = [];

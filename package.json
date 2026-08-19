@@ -37,7 +37,7 @@
     "security:audit": "npm audit",
     "security:audit-fix": "npm audit fix",
     "security:check": "npm run security:audit && npm run lint",
-    "type-check": "tsc --build --dry --force",
+    "type-check": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tsconfig.server.json",
     "clean": "rimraf dist node_modules/.vite",
     "test:security": "npm run security:check && npm run type-check",
     "install:devtools": "npm install --save-dev @tanstack/react-query-devtools@^5.56.2",

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../app';
-import { signAuthToken } from '../lib/token';
+import { createApp } from '../app.js';
+import { signAuthToken } from '../lib/token.js';
 
 const favorites = new Set<string>();
 const users = new Map<string, any>();

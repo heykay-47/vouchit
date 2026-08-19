@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createAuthCookie, signAuthToken, verifyAuthToken } from './token';
+import { createAuthCookie, signAuthToken, verifyAuthToken } from './token.js';
 
 describe('token helpers', () => {
   beforeEach(() => {

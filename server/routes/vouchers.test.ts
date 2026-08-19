@@ -1,8 +1,8 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../app';
-import { signAuthToken } from '../lib/token';
-import { Voucher } from '../models/Voucher';
+import { createApp } from '../app.js';
+import { signAuthToken } from '../lib/token.js';
+import { Voucher } from '../models/Voucher.js';
 
 const vouchers: any[] = [];
 const comments: any[] = [];
@@ -85,7 +85,7 @@ describe('voucher routes', () => {
     process.env.JWT_SECRET = 'test-secret';
     vouchers.length = 0;
     comments.length = 0;
-    Voucher.find.mockClear();
+    vi.clearAllMocks();
   });
 
   it('creates a voucher for an authenticated user', async () => {

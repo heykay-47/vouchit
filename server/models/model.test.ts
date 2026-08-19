@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { User } from './User';
-import { Voucher } from './Voucher';
-import { Favorite } from './Favorite';
-import { ReportedVoucher } from './ReportedVoucher';
+import { User } from './User.js';
+import { Voucher } from './Voucher.js';
+import { Favorite } from './Favorite.js';
+import { ReportedVoucher } from './ReportedVoucher.js';
+import { BusinessProfile } from './BusinessProfile.js';
 
 describe('mongoose models', () => {
   it('defines core collection names', () => {
@@ -25,5 +26,17 @@ describe('mongoose models', () => {
     expect(voucher.isRedeemed).toBe(false);
     expect(voucher.reportCount).toBe(0);
     expect(voucher.isActive).toBe(true);
+  });
+
+  it('defaults new users to the customer role', () => {
+    const user = new User({ email: 'legacy@example.com', username: 'legacy', passwordHash: 'hash' });
+    expect(user.role).toBe('customer');
+  });
+
+  it('allows one business profile per user', () => {
+    const indexes = BusinessProfile.schema.indexes();
+    expect(indexes).toEqual(expect.arrayContaining([
+      [{ userId: 1 }, expect.objectContaining({ unique: true })],
+    ]));
   });
 });

@@ -29,7 +29,7 @@ function Harness({ onAuthenticated }: { onAuthenticated?: () => void }) {
   return (
     <>
       <button onClick={() => openLogin(undefined, onAuthenticated)}>open login</button>
-      <button onClick={openSignup}>open signup</button>
+      <button onClick={() => openSignup()}>open signup</button>
     </>
   );
 }

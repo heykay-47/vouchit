@@ -1,8 +1,8 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../app';
-import { signAuthToken } from '../lib/token';
-import { User } from '../models/User';
+import { createApp } from '../app.js';
+import { signAuthToken } from '../lib/token.js';
+import { User } from '../models/User.js';
 
 const requests: any[] = [];
 const activities: any[] = [];
