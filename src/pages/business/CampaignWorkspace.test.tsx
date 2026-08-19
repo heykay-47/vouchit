@@ -23,7 +23,7 @@ vi.mock('@/hooks/useBusinessQueries', () => ({
   useUpdateCampaignMutation: () => updateMutation,
 }));
 vi.mock('@/components/business/CampaignDetailsForm', () => ({
-  default: (props: { initialValues?: Partial<CampaignDraftInput>; onSubmit: (input: CampaignDraftInput) => void; disabled?: boolean }) => {
+  default: function MockCampaignDetailsForm(props: { initialValues?: Partial<CampaignDraftInput>; onSubmit: (input: CampaignDraftInput) => void; disabled?: boolean }) {
     const [title] = useState(props.initialValues?.title ?? '');
     detailsProps.disabled = Boolean(props.disabled);
     return <button onClick={() => void props.onSubmit({} as CampaignDraftInput)}>save details mock {title}</button>;
