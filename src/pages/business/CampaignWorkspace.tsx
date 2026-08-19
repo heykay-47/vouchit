@@ -70,6 +70,7 @@ export default function CampaignWorkspace() {
       <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
         <h2 className="mb-4 text-lg font-medium lowercase">campaign details</h2>
         <CampaignDetailsForm
+          key={campaign?.id ?? 'new-campaign'}
           initialValues={initialValues}
           disabled={isLocked}
           isSubmitting={createMutation.isPending || updateMutation.isPending}

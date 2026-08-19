@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CampaignDraftInput, CampaignWorkspace as CampaignWorkspaceData } from '@/lib/types';
@@ -22,9 +23,10 @@ vi.mock('@/hooks/useBusinessQueries', () => ({
   useUpdateCampaignMutation: () => updateMutation,
 }));
 vi.mock('@/components/business/CampaignDetailsForm', () => ({
-  default: (props: { onSubmit: (input: CampaignDraftInput) => void; disabled?: boolean }) => {
+  default: (props: { initialValues?: Partial<CampaignDraftInput>; onSubmit: (input: CampaignDraftInput) => void; disabled?: boolean }) => {
+    const [title] = useState(props.initialValues?.title ?? '');
     detailsProps.disabled = Boolean(props.disabled);
-    return <button onClick={() => void props.onSubmit({} as CampaignDraftInput)}>save details mock</button>;
+    return <button onClick={() => void props.onSubmit({} as CampaignDraftInput)}>save details mock {title}</button>;
   },
 }));
 vi.mock('@/components/business/CampaignInventoryImport', () => ({
@@ -96,7 +98,8 @@ describe('CampaignWorkspace', () => {
     await user.click(screen.getByRole('button', { name: 'save details mock' }));
 
     expect(createMutation.mutateAsync).toHaveBeenCalledWith({});
-    expect(await screen.findByText('inventory import mock')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'save details mock Save on groceries' })).toBeInTheDocument();
+    expect(screen.getByText('inventory import mock')).toBeInTheDocument();
   });
 
   it('locks details and import controls when the server returns lockedAt', () => {
