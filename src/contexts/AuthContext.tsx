@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
-import { User as AppUser } from '@/lib/types';
+import type { AuthContextType, SignupInput, User as AppUser } from '@/lib/types';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -12,18 +12,6 @@ import { toast } from '@/utils/toast';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger({ context: { component: 'AuthContext' } });
-
-interface AuthContextType {
-  user: AppUser | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  signup: (email: string, username: string, password: string, rememberMe?: boolean) => Promise<void>;
-  logout: () => Promise<void>;
-  updateProfile: (updates: Partial<AppUser>) => Promise<void>;
-  toggleFavorite: (voucherId: string) => Promise<void>;
-  refreshUser: () => Promise<void>;
-}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -71,22 +59,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error(result.error || 'Login failed');
       throw new Error(result.error);
     }
-    if (result.user) setUser(result.user as AppUser);
+    if (!result.user) {
+      setIsLoading(false);
+      toast.error('Login failed');
+      throw new Error('Login failed');
+    }
+    setUser(result.user);
     setIsLoading(false);
     toast.success('Welcome back!');
+    return result.user;
   }, []);
 
-  const signup = useCallback(async (email: string, username: string, password: string, rememberMe = false) => {
+  const signup = useCallback(async (input: SignupInput) => {
     setIsLoading(true);
-    const result = await signUpWithEmail(email, password, username, rememberMe);
+    const result = await signUpWithEmail(input);
     if (!result.success) {
       setIsLoading(false);
       toast.error(result.error || 'Signup failed');
       throw new Error(result.error);
     }
-    if (result.user) setUser(result.user as AppUser);
+    if (!result.user) {
+      setIsLoading(false);
+      toast.error('Signup failed');
+      throw new Error('Signup failed');
+    }
+    setUser(result.user);
     setIsLoading(false);
     toast.success('Account created successfully!');
+    return result.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -108,7 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       const updatedUser = await updateProfileService(updates);
-      setUser(updatedUser as AppUser);
+      setUser(updatedUser);
       toast.success('Profile updated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update profile');
@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { user: apiUser } = await getCurrentUser();
       if (apiUser && mountedRef.current) {
-        setUser(apiUser as AppUser);
+        setUser(apiUser);
       }
     } catch (error) {
       logger.error('Error refreshing user', error);

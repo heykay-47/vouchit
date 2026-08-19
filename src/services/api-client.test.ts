@@ -16,4 +16,24 @@ describe('apiRequest', () => {
       headers: {},
     }));
   });
+
+  it('can suppress the auth event for an expected unauthorized response', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      data: null,
+      error: { message: 'Invalid email or password', details: { field: 'credentials' } },
+    }), { status: 401 }));
+    const auth401 = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    window.addEventListener('auth:401', auth401);
+
+    await expect(
+      apiRequest('/api/auth/login', { method: 'POST' }, { suppressAuthEvent: true }),
+    ).rejects.toMatchObject({
+      status: 401,
+      details: { field: 'credentials' },
+    });
+
+    expect(auth401).not.toHaveBeenCalled();
+    window.removeEventListener('auth:401', auth401);
+  });
 });

@@ -1,18 +1,24 @@
 export type ApiEnvelope<T> = {
   data: T | null;
-  error: { message: string } | null;
+  error: { message: string; details?: Record<string, unknown> } | null;
 };
 
 export class ApiClientError extends Error {
   status: number;
+  details?: Record<string, unknown>;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, details?: Record<string, unknown>) {
     super(message);
     this.status = status;
+    this.details = details;
   }
 }
 
-export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+export const apiRequest = async <T>(
+  path: string,
+  init: RequestInit = {},
+  options: { suppressAuthEvent?: boolean } = {},
+): Promise<T> => {
   const hasJsonBody = init.body !== undefined && !(init.body instanceof FormData);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
@@ -37,7 +43,7 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   }
   clearTimeout(timeout);
 
-  if (response.status === 401) {
+  if (response.status === 401 && !options.suppressAuthEvent) {
     window.dispatchEvent(new CustomEvent('auth:401'));
   }
 
@@ -49,7 +55,11 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}): Promi
   }
 
   if (!response.ok || envelope.error) {
-    throw new ApiClientError(envelope.error?.message ?? 'Request failed', response.status);
+    throw new ApiClientError(
+      envelope.error?.message ?? 'Request failed',
+      response.status,
+      envelope.error?.details,
+    );
   }
 
   return envelope.data as T;

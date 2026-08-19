@@ -1,4 +1,4 @@
-import { User as AppUser } from '@/lib/types';
+import type { SignupInput, User as AppUser } from '@/lib/types';
 import { apiRequest } from './api-client';
 
 export interface AuthResult {
@@ -7,6 +7,13 @@ export interface AuthResult {
   user?: AppUser;
   requiresEmailConfirmation?: boolean;
 }
+
+type ApiUser = Omit<AppUser, 'createdAt'> & { createdAt: string | Date };
+
+export const hydrateUser = (user: ApiUser): AppUser => ({
+  ...user,
+  createdAt: new Date(user.createdAt),
+});
 
 const authCall = async <T>(fn: () => Promise<T>): Promise<AuthResult & T> => {
   try {
@@ -20,18 +27,21 @@ const authCall = async <T>(fn: () => Promise<T>): Promise<AuthResult & T> => {
   }
 };
 
+const hydrateAuthResult = (result: AuthResult & { user?: ApiUser }): AuthResult => ({
+  ...result,
+  ...(result.user ? { user: hydrateUser(result.user) } : {}),
+});
+
 export const signUpWithEmail = async (
-  email: string,
-  password: string,
-  username: string,
-  rememberMe = false
+  input: SignupInput,
 ): Promise<AuthResult> => {
-  return authCall(() =>
-    apiRequest<{ user: AppUser }>('/api/auth/signup', {
+  const result = await authCall(() =>
+    apiRequest<{ user: ApiUser }>('/api/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password, username, rememberMe }),
-    })
+      body: JSON.stringify(input),
+    }),
   );
+  return hydrateAuthResult(result);
 };
 
 export const signInWithEmail = async (
@@ -39,12 +49,13 @@ export const signInWithEmail = async (
   password: string,
   rememberMe = false
 ): Promise<AuthResult> => {
-  return authCall(() =>
-    apiRequest<{ user: AppUser }>('/api/auth/login', {
+  const result = await authCall(() =>
+    apiRequest<{ user: ApiUser }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password, rememberMe }),
-    })
+    }, { suppressAuthEvent: true }),
   );
+  return hydrateAuthResult(result);
 };
 
 export const signOut = async (): Promise<AuthResult> => {
@@ -52,13 +63,14 @@ export const signOut = async (): Promise<AuthResult> => {
 };
 
 export const getCurrentUser = async () => {
-  return apiRequest<{ user: AppUser }>('/api/auth/me');
+  const result = await apiRequest<{ user: ApiUser }>('/api/auth/me');
+  return { ...result, user: hydrateUser(result.user) };
 };
 
 export const updateProfile = async (updates: Partial<AppUser>) => {
-  const { user } = await apiRequest<{ user: AppUser }>('/api/users/me', {
+  const { user } = await apiRequest<{ user: ApiUser }>('/api/users/me', {
     method: 'PATCH',
     body: JSON.stringify(updates),
   });
-  return user;
+  return hydrateUser(user);
 };

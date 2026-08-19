@@ -1,11 +1,32 @@
 export type VoucherPlatform = 'Google Pay' | 'Paytm' | 'PhonePe' | 'Other';
 export type VoucherCategory = 'Food' | 'Shopping' | 'Travel' | 'Entertainment' | 'Electronics' | 'Health' | 'Other';
+export type UserRole = 'customer' | 'business';
+
+export type SignupInput =
+  | {
+      role: 'customer';
+      email: string;
+      username: string;
+      password: string;
+      rememberMe?: boolean;
+    }
+  | {
+      role: 'business';
+      email: string;
+      username: string;
+      password: string;
+      rememberMe?: boolean;
+      organizationName: string;
+      contactName: string;
+      website?: string;
+    };
 
 export interface User {
   id: string;
   email: string;
   username: string;
   createdAt: Date;
+  role: UserRole;
   redeemedVouchers: string[]; // Array of voucher IDs
   favorites?: string[]; // Array of voucher IDs
   profileImage?: string;
@@ -58,11 +79,12 @@ export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  signup: (email: string, username: string, password: string) => Promise<void>;
-  logout: () => void;
-  updateProfile?: (data: Partial<User>) => Promise<void>;
-  toggleFavorite?: (voucherId: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<User>;
+  signup: (input: SignupInput) => Promise<User>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  toggleFavorite: (voucherId: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 export interface VoucherContextType {

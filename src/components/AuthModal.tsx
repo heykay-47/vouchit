@@ -5,33 +5,40 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { SignupInput, User, UserRole } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'login' | 'signup';
+  initialRole?: UserRole;
   returnFocus?: HTMLElement | null;
-  onAuthenticated?: () => void;
+  onAuthenticated?: (user: User) => void;
 }
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', returnFocus, onAuthenticated }: AuthModalProps) {
+export default function AuthModal({
+  isOpen,
+  onClose,
+  initialMode = 'login',
+  initialRole = 'customer',
+  returnFocus,
+  onAuthenticated,
+}: AuthModalProps) {
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+  const [role, setRole] = useState<UserRole>(initialRole);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [website, setWebsite] = useState('');
   const [rememberMe, setRememberMe] = useState(true); // Default to remembered
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { login, signup, isAuthenticated } = useAuth();
-
-  // Close modal when user becomes authenticated
-  useEffect(() => {
-    if (isAuthenticated && isOpen) {
-      onClose();
-    }
-  }, [isAuthenticated, isOpen, onClose]);
+  const { login, signup } = useAuth();
 
   // Reset form state when modal opens
   useEffect(() => {
@@ -39,13 +46,21 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
       setEmail('');
       setUsername('');
       setPassword('');
+      setOrganizationName('');
+      setContactName('');
+      setWebsite('');
       setError(null);
       setMode(initialMode);
+      setRole(initialRole);
     }
-  }, [isOpen, initialMode]);
+  }, [isOpen, initialMode, initialRole]);
 
   const switchMode = useCallback(() => {
-    setMode((prev) => (prev === 'login' ? 'signup' : 'login'));
+    setMode((prev) => {
+      const nextMode = prev === 'login' ? 'signup' : 'login';
+      if (nextMode === 'signup') setRole('customer');
+      return nextMode;
+    });
     setError(null);
     setPassword('');
   }, []);
@@ -82,14 +97,23 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
       if (!/^[a-zA-Z0-9_-]+$/.test(trimmedUsername)) {
         return 'Username can only contain letters, numbers, underscores, and hyphens';
       }
+
+      if (role === 'business') {
+        if (!organizationName.trim()) {
+          return 'Organization name is required';
+        }
+        if (!contactName.trim()) {
+          return 'Contact name is required';
+        }
+      }
     }
 
     if (!password) {
       return 'Password is required';
     }
 
-    if (password.length < 6) {
-      return 'Password must be at least 6 characters';
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters';
     }
 
     return null;
@@ -106,12 +130,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
 
     setError(null);
     setIsSubmitting(true);
+    let authenticatedUser: User;
 
     try {
       if (mode === 'login') {
-        await login(email.trim(), password, rememberMe);
+        authenticatedUser = await login(email.trim(), password, rememberMe);
       } else {
-        await signup(email.trim(), username.trim(), password, rememberMe);
+        const baseInput = {
+          email: email.trim(),
+          username: username.trim(),
+          password,
+          rememberMe,
+        };
+        const input: SignupInput = role === 'business'
+          ? {
+              ...baseInput,
+              role,
+              organizationName: organizationName.trim(),
+              contactName: contactName.trim(),
+              ...(website.trim() ? { website: website.trim() } : {}),
+            }
+          : { ...baseInput, role };
+        authenticatedUser = await signup(input);
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -124,7 +164,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
       setIsSubmitting(false);
     }
 
-    onAuthenticated?.();
+    onAuthenticated?.(authenticatedUser);
   };
 
   return (
@@ -187,6 +227,39 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
               />
             </div>
 
+            {/* Account role (signup only) */}
+            <AnimatePresence>
+              {mode === 'signup' && (
+                <motion.div
+                  className="space-y-2"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Label id="account-type-label" htmlFor="account-type" className="lowercase">
+                    account type
+                  </Label>
+                  <Select
+                    value={role}
+                    onValueChange={(value) => setRole(value === 'business' ? 'business' : 'customer')}
+                  >
+                    <SelectTrigger
+                      id="account-type"
+                      aria-labelledby="account-type-label"
+                      className="h-11"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="customer">customer</SelectItem>
+                      <SelectItem value="business">business</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Username (signup only) */}
             <AnimatePresence>
               {mode === 'signup' && (
@@ -221,6 +294,76 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
               )}
             </AnimatePresence>
 
+            {/* Business details (business signup only) */}
+            <AnimatePresence>
+              {mode === 'signup' && role === 'business' && (
+                <motion.div
+                  className="space-y-4"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="organizationName" className="lowercase">
+                      organization name
+                    </Label>
+                    <Input
+                      id="organizationName"
+                      type="text"
+                      value={organizationName}
+                      onChange={(e) => {
+                        setOrganizationName(e.target.value);
+                        setError(null);
+                      }}
+                      required
+                      autoComplete="organization"
+                      disabled={isSubmitting}
+                      maxLength={120}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactName" className="lowercase">
+                      contact name
+                    </Label>
+                    <Input
+                      id="contactName"
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => {
+                        setContactName(e.target.value);
+                        setError(null);
+                      }}
+                      required
+                      autoComplete="name"
+                      disabled={isSubmitting}
+                      maxLength={120}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="website" className="lowercase">
+                      website
+                    </Label>
+                    <Input
+                      id="website"
+                      type="url"
+                      value={website}
+                      onChange={(e) => {
+                        setWebsite(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder="https://acme.example"
+                      autoComplete="url"
+                      disabled={isSubmitting}
+                      className="h-11"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Password */}
             <div className="space-y-2">
               <Label htmlFor="password" className="lowercase">
@@ -236,7 +379,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', retu
                   setError(null);
                 }}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 disabled={isSubmitting}
                 className="h-11"
