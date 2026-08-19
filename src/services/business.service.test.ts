@@ -72,6 +72,12 @@ const apiInvoice = {
 const apiWorkspace = {
   ...apiCampaign,
   inventoryCount: 1,
+  inventory: [{
+    id: 'voucher-1',
+    sourceType: 'campaign' as const,
+    campaignId: 'campaign-1',
+    code: 'OWNER-CODE',
+  }],
   invoice: apiInvoice,
   analytics: null,
 };
@@ -81,6 +87,7 @@ const expectHydratedWorkspace = (workspace: CampaignWorkspace) => {
   expect(workspace.campaign.createdAt).toEqual(new Date(campaignDates.createdAt));
   expect(workspace.campaign.updatedAt).toEqual(new Date(campaignDates.updatedAt));
   expect(workspace.campaign.lockedAt).toEqual(new Date(campaignDates.lockedAt));
+  expect(workspace.inventory?.[0]).toMatchObject({ id: 'voucher-1', code: 'OWNER-CODE' });
   expect(workspace.invoice?.issuedAt).toEqual(new Date(apiInvoice.issuedAt));
   expect(workspace.invoice?.paidAt).toEqual(new Date(apiInvoice.paidAt));
   expect(workspace.invoice?.externalPaymentDate).toEqual(new Date(apiInvoice.externalPaymentDate));

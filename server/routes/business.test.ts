@@ -439,6 +439,52 @@ describe('business routes', () => {
     });
   });
 
+  it('returns campaign voucher codes to the owning business in list and detail workspaces only', async () => {
+    seedCampaign();
+    vouchers.push({
+      _id: { toString: () => '507f1f77bcf86cd799439040' },
+      campaignId,
+      sourceType: 'campaign',
+      donatedBy: businessId,
+      code: 'OWNER-CODE',
+      value: '₹50',
+      isActive: false,
+      isRedeemed: false,
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+    });
+
+    const listResponse = await request(createApp())
+      .get('/api/business/campaigns')
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+    const detailResponse = await request(createApp())
+      .get(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(listResponse.body.data.campaigns[0].inventory).toMatchObject([{
+      id: '507f1f77bcf86cd799439040',
+      campaignId,
+      code: 'OWNER-CODE',
+    }]);
+    expect(detailResponse.body.data.campaign.inventory).toMatchObject([{
+      id: '507f1f77bcf86cd799439040',
+      campaignId,
+      code: 'OWNER-CODE',
+    }]);
+
+    const unrelatedListResponse = await request(createApp())
+      .get('/api/business/campaigns')
+      .set('Cookie', [`auth_token=${tokenFor(otherBusinessId)}`])
+      .expect(200);
+    expect(unrelatedListResponse.body.data.campaigns).toEqual([]);
+
+    await request(createApp())
+      .get(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor(otherBusinessId)}`])
+      .expect(403);
+  });
+
   it('keeps analytics null before payment and observes completed paid campaigns in detail', async () => {
     const { campaign, invoice } = seedIssuedInvoice({ status: 'paid', paidAt: new Date('2026-08-19T00:02:00.000Z') });
     campaign.status = 'completed';

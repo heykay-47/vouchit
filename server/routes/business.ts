@@ -8,7 +8,7 @@ import {
 } from '../lib/campaign-inventory.js';
 import { calculateCampaignAnalytics } from '../lib/campaign-analytics.js';
 import { quoteCampaign } from '../lib/campaign-pricing.js';
-import { toCampaignResponse } from '../lib/business-serializers.js';
+import { toBusinessVoucherResponse, toCampaignResponse } from '../lib/business-serializers.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { withTransaction } from '../lib/transaction.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
@@ -120,6 +120,7 @@ const campaignWorkspace = async (
   return {
     ...campaignResponse,
     inventoryCount,
+    ...(data?.vouchers ? { inventory: data.vouchers.map(toBusinessVoucherResponse) } : {}),
     invoice: invoice ? toInvoiceResponse(invoice) : null,
     analytics,
   };

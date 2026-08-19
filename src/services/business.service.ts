@@ -4,6 +4,7 @@ import type {
   CampaignDraftInput,
   CampaignInventoryCandidate,
   CampaignInventoryPreview,
+  CampaignInventoryVoucher,
   CampaignSummary,
   CampaignWorkspace,
   Invoice,
@@ -26,6 +27,7 @@ type ApiInvoice = Omit<Invoice, 'issuedAt' | 'paidAt' | 'externalPaymentDate'> &
 
 type ApiCampaignWorkspace = ApiCampaign & {
   inventoryCount: number;
+  inventory?: CampaignInventoryVoucher[];
   invoice: ApiInvoice | null;
   analytics: CampaignAnalytics | null;
 };
@@ -52,10 +54,11 @@ const hydrateInvoice = (invoice: ApiInvoice): Invoice => {
 };
 
 const hydrateWorkspace = (workspace: ApiCampaignWorkspace): CampaignWorkspace => {
-  const { inventoryCount, invoice, analytics, ...campaign } = workspace;
+  const { inventoryCount, inventory, invoice, analytics, ...campaign } = workspace;
   return {
     campaign: hydrateCampaign(campaign),
     inventoryCount,
+    ...(inventory ? { inventory } : {}),
     invoice: invoice ? hydrateInvoice(invoice) : null,
     analytics,
   };

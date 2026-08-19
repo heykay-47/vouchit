@@ -112,6 +112,16 @@ export interface CampaignAnalytics {
   feePerClaimPaise: number | null;
 }
 
+export interface CampaignInventoryVoucher {
+  id: string;
+  sourceType: 'campaign';
+  campaignId?: string;
+  code: string;
+  value?: string;
+  isRedeemed?: boolean;
+  isActive?: boolean;
+}
+
 export interface Invoice {
   id: string;
   campaignId: string;
@@ -132,6 +142,7 @@ export interface Invoice {
 export interface CampaignWorkspace {
   campaign: Campaign;
   inventoryCount: number;
+  inventory?: CampaignInventoryVoucher[];
   invoice: Invoice | null;
   analytics: CampaignAnalytics | null;
 }

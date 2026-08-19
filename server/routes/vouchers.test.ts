@@ -495,6 +495,10 @@ describe('voucher routes', () => {
     });
 
     const res = await request(createApp()).get('/api/vouchers').expect(200);
+    const unrelatedRes = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h')}`])
+      .expect(200);
 
     expect(res.body.data.vouchers[0]).toMatchObject({
       sourceType: 'campaign',
@@ -506,6 +510,7 @@ describe('voucher routes', () => {
       },
     });
     expect(res.body.data.vouchers[0].code).toBeUndefined();
+    expect(unrelatedRes.body.data.vouchers[0].code).toBeUndefined();
     expect(BusinessProfile.find).toHaveBeenCalledWith({ _id: { $in: [campaign.businessProfileId.toString()] } });
     expect(Campaign.find).toHaveBeenNthCalledWith(2, { _id: { $in: [campaign._id.toString()] } });
   });
