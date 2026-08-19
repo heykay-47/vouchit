@@ -103,6 +103,13 @@ const requireDraft = (campaign: CampaignDocument) => {
   }
 };
 
+const draftCampaignFilter = (campaignId: string, businessId: string) => ({
+  _id: campaignId,
+  businessId,
+  status: 'draft',
+  lockedAt: null,
+});
+
 router.use(requireAuth, requireRole('business'));
 
 router.get('/campaigns', asyncRoute(async (req, res) => {
@@ -142,11 +149,19 @@ router.patch('/campaigns/:id', asyncRoute(async (req, res) => {
   const campaign = await requireOwnedCampaign(authedReq);
   requireDraft(campaign);
   const input = campaignPatchSchema.parse(req.body);
-  const updated = await Campaign.findByIdAndUpdate(
-    req.params.id,
-    { $set: input },
-    { new: true, runValidators: true },
-  );
+  const updated = await withTransaction(async (session) => {
+    const current = await Campaign.findOneAndUpdate(
+      draftCampaignFilter(req.params.id, authedReq.userId),
+      { $set: input },
+      { new: true, runValidators: true, session },
+    );
+
+    if (!current) {
+      throw new ApiError(409, 'Campaign is locked');
+    }
+
+    return current;
+  });
 
   if (!updated) {
     throw new ApiError(404, 'Campaign not found');
@@ -183,7 +198,17 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
 
   const campaignId = req.params.id;
   const businessId = userIdFrom(authedReq);
-  await withTransaction(async (session) => {
+  const current = await withTransaction(async (session) => {
+    const currentCampaign = await Campaign.findOneAndUpdate(
+      draftCampaignFilter(campaignId, businessId),
+      { $set: { updatedAt: new Date() } },
+      { new: true, session },
+    );
+
+    if (!currentCampaign) {
+      throw new ApiError(409, 'Campaign is locked');
+    }
+
     await Voucher.deleteMany({ campaignId, sourceType: 'campaign' }, { session });
     await Voucher.create(
       preview.accepted.map((row: CampaignInventoryCandidate) => ({
@@ -192,14 +217,16 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
         code: row.code,
         ...(row.value === undefined ? {} : { value: row.value }),
         donatedBy: businessId,
-        expiryDate: campaign.expiryDate,
+        expiryDate: currentCampaign.expiryDate,
         isActive: false,
       })),
       { session },
     );
+
+    return currentCampaign;
   });
 
-  ok(res, { campaign: await campaignWorkspace(campaign) });
+  ok(res, { campaign: await campaignWorkspace(current) });
 }));
 
 export { router as businessRouter };

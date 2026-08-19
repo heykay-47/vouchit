@@ -2,6 +2,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
+import { withTransaction } from '../lib/transaction.js';
 import { Campaign } from '../models/Campaign.js';
 import { Voucher } from '../models/Voucher.js';
 
@@ -60,8 +61,13 @@ vi.mock('../models/Campaign', () => ({
       campaigns.push(campaign);
       return campaign;
     }),
-    findByIdAndUpdate: vi.fn(async (id: string, update: Record<string, unknown>) => {
-      const campaign = campaigns.find((item) => String(item._id) === id);
+    findOneAndUpdate: vi.fn(async (query: Record<string, unknown>, update: Record<string, unknown>) => {
+      const campaign = campaigns.find((item) => (
+        String(item._id) === String(query._id)
+        && String(item.businessId) === String(query.businessId)
+        && item.status === query.status
+        && (query.lockedAt === undefined || item.lockedAt === query.lockedAt)
+      ));
       if (!campaign) return null;
       const changes = update.$set as Record<string, unknown> | undefined;
       Object.assign(campaign, changes ?? update);
@@ -192,11 +198,30 @@ describe('business routes', () => {
       .expect(200);
 
     expect(updateResponse.body.data.campaign.title).toBe('Updated campaign');
-    expect(Campaign.findByIdAndUpdate).toHaveBeenCalledWith(
-      campaignId,
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: campaignId,
+        businessId,
+        status: 'draft',
+        lockedAt: null,
+      },
       { $set: expect.objectContaining({ title: 'Updated campaign' }) },
-      { new: true, runValidators: true },
+      { new: true, runValidators: true, session },
     );
+  });
+
+  it('rejects a stale draft update without modifying the campaign', async () => {
+    const campaign = seedCampaign();
+    vi.mocked(Campaign.findOneAndUpdate).mockResolvedValueOnce(null);
+
+    await request(createApp())
+      .patch(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ ...validCampaign, title: 'Stale update' })
+      .expect(409);
+
+    expect(campaign.title).toBe(validCampaign.title);
+    expect(withTransaction).toHaveBeenCalledOnce();
   });
 
   it('rejects updates and inventory changes after a campaign is locked', async () => {
@@ -257,6 +282,16 @@ describe('business routes', () => {
       { campaignId, sourceType: 'campaign' },
       { session },
     );
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: campaignId,
+        businessId,
+        status: 'draft',
+        lockedAt: null,
+      },
+      { $set: { updatedAt: expect.any(Date) } },
+      { new: true, session },
+    );
     expect(Voucher.create).toHaveBeenCalledWith([
       expect.objectContaining({
         sourceType: 'campaign',
@@ -275,6 +310,21 @@ describe('business routes', () => {
       }),
     ], { session });
     expect(Voucher.create).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ session: expect.not.objectContaining(session) }));
+  });
+
+  it('rejects a stale inventory replacement before deleting existing rows', async () => {
+    seedCampaign();
+    vouchers.push({ campaignId, code: 'OLD-CODE' });
+    vi.mocked(Campaign.findOneAndUpdate).mockResolvedValueOnce(null);
+
+    await request(createApp())
+      .put(`/api/business/campaigns/${campaignId}/inventory`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ rows: [{ sourceRow: 2, code: 'SAVE10' }] })
+      .expect(409);
+
+    expect(vouchers).toEqual([{ campaignId, code: 'OLD-CODE' }]);
+    expect(Voucher.deleteMany).not.toHaveBeenCalled();
   });
 
   it('returns safe confirmation details and leaves no partial inventory on validation failure', async () => {
@@ -300,6 +350,7 @@ describe('business routes', () => {
 
   it('does not expose internal error details when replacement fails after deleting', async () => {
     seedCampaign();
+    vouchers.push({ campaignId, code: 'OLD-CODE' });
     vi.mocked(Voucher.create).mockRejectedValueOnce(new Error('database secret'));
     const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
@@ -312,7 +363,7 @@ describe('business routes', () => {
 
       expect(response.body.error).toEqual({ message: 'Internal server error' });
       expect(response.body.error.details).toBeUndefined();
-      expect(vouchers).toEqual([]);
+      expect(vouchers).toEqual([{ campaignId, code: 'OLD-CODE' }]);
     } finally {
       stderrWrite.mockRestore();
     }
