@@ -47,6 +47,9 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   const daysUntilExpiry = getDaysUntilExpiry();
   const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 3;
   const campaignAttribution = voucher.sourceType === 'campaign' ? voucher.campaign : undefined;
+  const campaignAccessibleLabel = campaignAttribution
+    ? `, business campaign, ${campaignAttribution.organizationName}, ${campaignAttribution.brandName}`
+    : '';
   
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -165,7 +168,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
         <button
           ref={triggerRef}
           type="button"
-          aria-label={`${voucher.title}, ${voucher.platform}, ${status.label}, view details`}
+          aria-label={`${voucher.title}, ${voucher.platform}${campaignAccessibleLabel}, ${status.label}, view details`}
           className="min-h-[156px] w-full rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:bg-muted/60"
         >
           {/* Header */}
@@ -175,8 +178,8 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
               {campaignAttribution && (
                 <p className="mt-1 flex flex-wrap gap-x-1 text-[11px] text-muted-foreground">
                   <span>business campaign</span>
-                  <span>{campaignAttribution.organizationName}</span>
-                  <span>{campaignAttribution.brandName}</span>
+                  <span className="min-w-0 break-words">{campaignAttribution.organizationName}</span>
+                  <span className="min-w-0 break-words">{campaignAttribution.brandName}</span>
                 </p>
               )}
             </div>
@@ -225,8 +228,8 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
           {campaignAttribution && (
             <div className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
               <span>business campaign</span>
-              <span>{campaignAttribution.organizationName}</span>
-              <span>{campaignAttribution.brandName}</span>
+              <span className="min-w-0 break-words">{campaignAttribution.organizationName}</span>
+              <span className="min-w-0 break-words">{campaignAttribution.brandName}</span>
             </div>
           )}
         </DialogHeader>

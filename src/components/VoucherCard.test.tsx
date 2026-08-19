@@ -138,6 +138,37 @@ describe('VoucherCard', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Acme Rewards');
   });
 
+  it('includes campaign attribution in the card accessible name', () => {
+    render(<VoucherCard voucher={campaignVoucher} />);
+
+    expect(screen.getByRole('button', {
+      name: 'Business Weekend Reward, Google Pay, business campaign, Acme Offers, Acme Rewards, available, view details',
+    })).toBeInTheDocument();
+  });
+
+  it('wraps long campaign attribution names in the card and dialog', async () => {
+    const user = setupUser();
+    const longOrganizationName = 'Organization'.repeat(20);
+    const longBrandName = 'Brand'.repeat(20);
+    const longCampaignVoucher = {
+      ...campaignVoucher,
+      campaign: {
+        campaignId: 'campaign-1',
+        brandName: longBrandName,
+        organizationName: longOrganizationName,
+      },
+    } as unknown as Voucher;
+    render(<VoucherCard voucher={longCampaignVoucher} />);
+
+    expect(screen.getByText(longOrganizationName)).toHaveClass('min-w-0', 'break-words');
+    expect(screen.getByText(longBrandName)).toHaveClass('min-w-0', 'break-words');
+
+    await user.click(screen.getByRole('button', { name: /Business Weekend Reward.*view details/ }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(longOrganizationName)).toHaveClass('min-w-0', 'break-words');
+    expect(within(dialog).getByText(longBrandName)).toHaveClass('min-w-0', 'break-words');
+  });
+
   it('masks a campaign code when the client does not receive it', async () => {
     const user = setupUser();
     render(<VoucherCard voucher={{ ...campaignVoucher, code: undefined } as unknown as Voucher} />);
