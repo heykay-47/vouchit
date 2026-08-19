@@ -80,6 +80,13 @@ describe('Sidebar', () => {
     expect(window.location.pathname).toBe('/browse');
   });
 
+  it('makes the public business path discoverable without replacing browse', () => {
+    renderWithRouter(<Sidebar />, '/browse');
+
+    expect(screen.getByRole('link', { name: 'browse' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'for businesses' })).toHaveAttribute('href', '/for-businesses');
+  });
+
   it('opens a named mobile dialog and restores menu focus after Escape', async () => {
     const user = userEvent.setup();
     renderWithRouter(<Sidebar />, '/');
@@ -107,7 +114,7 @@ describe('Sidebar', () => {
     const drawer = within(screen.getByRole('dialog', { name: 'vouchit navigation' }));
 
     expect(drawer.getByRole('link', { name: /VouchIt/i })).toHaveClass('min-h-11');
-    for (const name of ['browse', 'community', 'about']) {
+    for (const name of ['browse', 'for businesses', 'community', 'about']) {
       expect(drawer.getByRole('link', { name })).toHaveClass('min-h-11');
     }
     expect(drawer.getByRole('button', { name: 'log in' })).toHaveClass('h-11');

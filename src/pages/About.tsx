@@ -12,9 +12,9 @@ export default function About() {
         <section>
           <h2 className="text-lg font-medium lowercase mb-3">what is this?</h2>
           <p className="text-muted-foreground leading-relaxed">
-            vouchit helps you share unused vouchers from google pay, paytm, phonepe 
-            and other platforms with people who can actually use them. instead of letting 
-            vouchers expire, donate them to the community.
+            vouchit is a prototype for vouchers shared by community members and business campaigns.
+            community members can pass on unused vouchers, while businesses can publish campaign
+            inventory for people who can use it before expiry.
           </p>
         </section>
 
@@ -39,8 +39,9 @@ export default function About() {
         <section>
           <h2 className="text-lg font-medium lowercase mb-3">community driven</h2>
           <p className="text-muted-foreground leading-relaxed">
-            this platform is built for the community, by the community. no ads, 
-            no tracking, no monetization. just people helping people save money.
+            the prototype records community voucher sharing and business campaign activity in one
+            ledger. external settlement is recorded before a business campaign publishes, and
+            observed campaign views and claims are shown only when available.
           </p>
         </section>
       </div>

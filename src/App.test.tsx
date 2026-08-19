@@ -22,6 +22,7 @@ vi.mock('./pages/business/BusinessDashboard', () => ({ default: () => <div>busin
 vi.mock('./pages/business/CampaignWorkspace', () => ({ default: () => <div>campaign workspace page</div> }));
 vi.mock('./pages/Settings', () => ({ default: () => <div>settings page</div> }));
 vi.mock('./pages/About', () => ({ default: () => <div>about page</div> }));
+vi.mock('./pages/ForBusinesses', () => ({ default: () => <div>for businesses page</div> }));
 vi.mock('./pages/Community', () => ({ default: () => <div>community page</div> }));
 vi.mock('./pages/NotFound', () => ({ default: () => <div>not found page</div> }));
 
@@ -68,6 +69,14 @@ describe('App route layouts', () => {
     render(<App />);
 
     expect(await screen.findByText('browse page')).toBeInTheDocument();
+    expect(screen.getByTestId('operating-sidebar')).toBeInTheDocument();
+  });
+
+  it('renders the public business positioning page inside the operating layout', async () => {
+    window.history.pushState({}, '', '/for-businesses');
+    render(<App />);
+
+    expect(await screen.findByText('for businesses page')).toBeInTheDocument();
     expect(screen.getByTestId('operating-sidebar')).toBeInTheDocument();
   });
 

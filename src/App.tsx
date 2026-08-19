@@ -22,6 +22,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Donate = lazy(() => import("./pages/Donate"));
 const Settings = lazy(() => import("./pages/Settings"));
 const About = lazy(() => import("./pages/About"));
+const ForBusinesses = lazy(() => import("./pages/ForBusinesses"));
 const Community = lazy(() => import("./pages/Community"));
 const BusinessDashboard = lazy(() => import("./pages/business/BusinessDashboard"));
 const CampaignWorkspace = lazy(() => import("./pages/business/CampaignWorkspace"));
@@ -136,6 +137,7 @@ const App = () => (
                       <Route path="/" element={<Index />} />
                       <Route element={<OperatingLayout />}>
                         <Route path="/browse" element={<Browse />} />
+                        <Route path="/for-businesses" element={<ForBusinesses />} />
                         <Route path="/donate" element={<RoleRoute role="customer"><Donate /></RoleRoute>} />
                         <Route path="/dashboard" element={<RoleRoute role="customer"><Dashboard /></RoleRoute>} />
                         <Route path="/business" element={<RoleRoute role="business"><BusinessDashboard /></RoleRoute>} />

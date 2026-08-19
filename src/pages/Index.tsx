@@ -42,7 +42,7 @@ export default function Index() {
           <div className="landing-hero__copy">
             <h1 id="landing-title">good vouchers shouldn't go unused.</h1>
             <p>
-              pass on what you cannot use. find something useful before it expires.
+              pass on what you cannot use. browse vouchers shared by community members and business campaigns before they expire.
             </p>
             <div className="landing-hero__actions">
               <Link className="landing-action landing-action--primary" to="/browse">browse vouchers</Link>
@@ -51,7 +51,7 @@ export default function Index() {
               </Button>
             </div>
           </div>
-          <p className="landing-hero__note">a simple exchange between people, not another promotions feed.</p>
+          <p className="landing-hero__note">community sharing and business campaigns, with each voucher subject to its own status and expiry.</p>
         </section>
 
         <ExchangeBoard />
@@ -78,6 +78,7 @@ export default function Index() {
             <Link className="landing-footer__link min-h-11" to="/browse">browse</Link>
             <Link className="landing-footer__link min-h-11" to="/community">community</Link>
             <Link className="landing-footer__link min-h-11" to="/about">about</Link>
+            <Link className="landing-footer__link min-h-11" to="/for-businesses">for businesses</Link>
             <a className="landing-footer__link min-h-11" href="https://github.com/heykay-47/vouchit.git" aria-label="vouchit repository">repository</a>
           </nav>
         </div>

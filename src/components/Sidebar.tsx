@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Info,
+  BriefcaseBusiness,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -39,6 +40,7 @@ const secondaryNav: NavItem[] = [
   { icon: Ticket, label: 'campaigns', path: '/business/campaigns', audience: 'business' },
   { icon: Ticket, label: 'invoices', path: '/business/invoices', audience: 'business' },
   { icon: Users, label: 'community', path: '/community', audience: 'public' },
+  { icon: BriefcaseBusiness, label: 'for businesses', path: '/for-businesses', audience: 'public' },
   { icon: Settings, label: 'settings', path: '/settings', audience: 'public', authRequired: true },
   { icon: Info, label: 'about', path: '/about', audience: 'public' },
 ];

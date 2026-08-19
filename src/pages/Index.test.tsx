@@ -260,7 +260,7 @@ describe('Index', () => {
     renderLanding();
 
     const footerLinks = within(screen.getByRole('contentinfo')).getAllByRole('link');
-    expect(footerLinks).toHaveLength(4);
+    expect(footerLinks).toHaveLength(5);
     footerLinks.forEach((link) => {
       expect(link).toHaveClass('landing-footer__link', 'min-h-11');
     });
@@ -272,6 +272,23 @@ describe('Index', () => {
     expect(within(screen.getByRole('navigation', { name: 'primary navigation' }))
       .getByRole('link', { name: 'community' }))
       .toHaveAttribute('href', '/community');
+  });
+
+  it('keeps browse primary while exposing the business path as a secondary landing link', () => {
+    renderLanding();
+
+    expect(screen.getAllByRole('link', { name: 'browse vouchers' })[0]).toHaveClass('landing-action--primary');
+    expect(screen.getAllByRole('link', { name: 'for businesses' })).toHaveLength(2);
+    screen.getAllByRole('link', { name: 'for businesses' }).forEach((link) => {
+      expect(link).toHaveAttribute('href', '/for-businesses');
+    });
+  });
+
+  it('describes both community vouchers and business campaigns without fabricated proof', () => {
+    renderLanding();
+
+    expect(screen.getByText(/community members and business campaigns/i)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/payment processed|verified businesses|guaranteed reach|merchant partners|production customers|direct swaps|no monetization/i);
   });
 
   it('states that browsing is public while donation and claiming require authentication', () => {

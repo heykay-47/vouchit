@@ -40,6 +40,7 @@ export default function LandingNav() {
           <a className="hover:bg-muted hover:text-foreground" href="#exchange-board" onClick={closeMobileNavigation}>how it works</a>
           <Link className="hover:bg-muted hover:text-foreground" to="/community" onClick={closeMobileNavigation}>community</Link>
           <Link className="hover:bg-muted hover:text-foreground" to="/about" onClick={closeMobileNavigation}>about vouchit</Link>
+          <Link className="hover:bg-muted hover:text-foreground" to="/for-businesses" onClick={closeMobileNavigation}>for businesses</Link>
           <Link className="hover:bg-muted hover:text-foreground" to="/browse" onClick={closeMobileNavigation}>browse</Link>
         </nav>
 
