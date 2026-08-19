@@ -109,11 +109,9 @@ export default function CampaignWorkspace() {
       {query.data?.invoice ? (
         <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
           <CampaignInvoice invoice={query.data.invoice} />
-          {query.data.invoice.status === 'issued' ? (
-            <div className="mt-6 border-t border-border pt-6">
-              <SettlementForm invoice={query.data.invoice} />
-            </div>
-          ) : null}
+          <div className="mt-6 border-t border-border pt-6">
+            <SettlementForm invoice={query.data.invoice} />
+          </div>
         </div>
       ) : null}
     </section>

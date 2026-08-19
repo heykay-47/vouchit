@@ -1,16 +1,11 @@
 import { Link } from 'react-router-dom';
+import { formatInvoiceDate } from '@/lib/invoice-dates';
 import { formatPaiseAsInr } from '@/lib/money';
 import type { Invoice } from '@/lib/types';
 
 interface InvoiceListProps {
   invoices: Invoice[];
 }
-
-const formatDate = (date: Date) => date.toLocaleDateString('en-IN', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-});
 
 export default function InvoiceList({ invoices }: InvoiceListProps) {
   if (invoices.length === 0) {
@@ -44,7 +39,7 @@ export default function InvoiceList({ invoices }: InvoiceListProps) {
             </div>
             <div>
               <dt className="text-muted-foreground">issued</dt>
-              <dd className="font-medium">{formatDate(invoice.issuedAt)}</dd>
+              <dd className="font-medium">{formatInvoiceDate(invoice.issuedAt)}</dd>
             </div>
           </dl>
         </article>

@@ -160,4 +160,33 @@ describe('CampaignWorkspace', () => {
     expect(screen.getByRole('heading', { name: 'campaign invoice' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'record external payment' })).toBeInTheDocument();
   });
+
+  it('keeps paid payment audit data visible after workspace query refresh', () => {
+    queryState.data = {
+      ...workspace,
+      campaign: { ...workspace.campaign, status: 'active', effectiveStatus: 'active' },
+      invoice: {
+        id: 'invoice-1',
+        campaignId: 'campaign-1',
+        businessId: 'business-1',
+        priceVersion: 'v1',
+        currency: 'INR',
+        baseFeePaise: 9900,
+        perVoucherFeePaise: 200,
+        quantity: 2,
+        totalPaise: 10300,
+        status: 'paid',
+        issuedAt: new Date('2026-08-19T03:00:00.000Z'),
+        paidAt: new Date('2026-08-19T06:00:00.000Z'),
+        externalPaymentReference: 'BANK-WORKSPACE-001',
+        externalPaymentDate: new Date('2026-08-19T23:59:59.999Z'),
+      },
+    };
+
+    renderWorkspace('/business/campaigns/campaign-1');
+
+    expect(screen.getByText('BANK-WORKSPACE-001')).toBeInTheDocument();
+    expect(screen.getByText(/11:59 pm/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'record external payment' })).not.toBeInTheDocument();
+  });
 });

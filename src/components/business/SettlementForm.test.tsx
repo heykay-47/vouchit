@@ -21,7 +21,7 @@ const issuedInvoice: Invoice = {
   baseFeePaise: 9900,
   perVoucherFeePaise: 200,
   quantity: 1,
-  totalPaise: 10100,
+  totalPaise: 101000,
   status: 'issued',
   issuedAt: new Date('2026-08-18T03:00:00.000Z'),
 };
@@ -31,7 +31,7 @@ const paidInvoice: Invoice = {
   status: 'paid',
   paidAt: new Date('2026-08-19T06:00:00.000Z'),
   externalPaymentReference: 'BANK-001',
-  externalPaymentDate: new Date('2026-08-19T00:00:00.000Z'),
+  externalPaymentDate: new Date('2026-08-18T23:59:59.999Z'),
 };
 
 describe('SettlementForm', () => {
@@ -44,8 +44,9 @@ describe('SettlementForm', () => {
     const user = userEvent.setup();
     render(<SettlementForm invoice={issuedInvoice} />);
 
+    expect(screen.getByLabelText('payment amount (INR)')).toHaveValue('1010.00');
     await user.type(screen.getByLabelText('payment reference'), 'BANK-001');
-    await user.type(screen.getByLabelText('payment date'), '2026-08-19');
+    await user.type(screen.getByLabelText('payment date'), '2026-08-18');
     await user.click(screen.getByRole('button', { name: 'record external payment' }));
 
     expect(recordSettlement).toHaveBeenCalledWith({
@@ -53,11 +54,19 @@ describe('SettlementForm', () => {
       input: {
         amountPaise: issuedInvoice.totalPaise,
         externalPaymentReference: 'BANK-001',
-        externalPaymentDate: '2026-08-19T00:00:00.000Z',
+        externalPaymentDate: '2026-08-18T23:59:59.999Z',
       },
     });
     expect(screen.queryByText(/pay now|processed|verified/i)).not.toBeInTheDocument();
     expect(await screen.findByText('BANK-001')).toBeInTheDocument();
     expect(screen.queryByLabelText('payment reference')).not.toBeInTheDocument();
+  });
+
+  it('renders paid reference and date as read-only audit data after a refreshed invoice', () => {
+    render(<SettlementForm invoice={paidInvoice} />);
+
+    expect(screen.getByText('BANK-001')).toBeInTheDocument();
+    expect(screen.getByText(/18 Aug 2026/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'record external payment' })).not.toBeInTheDocument();
   });
 });

@@ -29,6 +29,14 @@ const invoice: Invoice = {
   issuedAt: new Date('2026-08-19T03:00:00.000Z'),
 };
 
+const paidInvoice: Invoice = {
+  ...invoice,
+  status: 'paid',
+  externalPaymentReference: 'BANK-PAID-001',
+  externalPaymentDate: new Date('2026-08-19T23:59:59.999Z'),
+  paidAt: new Date('2026-08-20T06:00:00.000Z'),
+};
+
 describe('BusinessInvoices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,5 +55,14 @@ describe('BusinessInvoices', () => {
       '/business/campaigns/campaign-1',
     );
     expect(screen.getByRole('button', { name: 'record external payment' })).toBeInTheDocument();
+  });
+
+  it('keeps paid payment audit data visible after invoice query refresh', () => {
+    invoicesQuery.data = [paidInvoice];
+    render(<MemoryRouter><BusinessInvoices /></MemoryRouter>);
+
+    expect(screen.getByText('BANK-PAID-001')).toBeInTheDocument();
+    expect(screen.getByText(/11:59 pm/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'record external payment' })).not.toBeInTheDocument();
   });
 });

@@ -3,22 +3,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRecordSettlementMutation } from '@/hooks/useBusinessQueries';
-import { formatPaiseAsInr, formatPaiseAsRupees, parseRupeesToPaise } from '@/lib/money';
+import { formatInvoiceDateTime, toSettlementDateTime } from '@/lib/invoice-dates';
+import { formatPaiseAsInr, formatPaiseAsRupeesInput, parseRupeesToPaise } from '@/lib/money';
 import type { Invoice } from '@/lib/types';
 
 interface SettlementFormProps {
   invoice: Invoice;
 }
 
-const formatDate = (date?: Date) => date?.toLocaleString('en-IN', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'UTC',
-}) ?? 'not available';
-
 export default function SettlementForm({ invoice }: SettlementFormProps) {
   const mutation = useRecordSettlementMutation();
-  const [amount, setAmount] = useState(formatPaiseAsRupees(invoice.totalPaise));
+  const [amount, setAmount] = useState(formatPaiseAsRupeesInput(invoice.totalPaise));
   const [reference, setReference] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [settledInvoice, setSettledInvoice] = useState<Invoice | null>(null);
@@ -30,15 +25,12 @@ export default function SettlementForm({ invoice }: SettlementFormProps) {
     setError(null);
     try {
       if (!paymentDate) throw new Error('payment date is required');
-      const parsedDate = new Date(`${paymentDate}T00:00:00.000Z`);
-      if (Number.isNaN(parsedDate.getTime())) throw new Error('payment date is invalid');
-
       const result = await mutation.mutateAsync({
         id: invoice.id,
         input: {
           amountPaise: parseRupeesToPaise(amount),
           externalPaymentReference: reference.trim(),
-          externalPaymentDate: parsedDate.toISOString(),
+          externalPaymentDate: toSettlementDateTime(paymentDate),
         },
       });
       setSettledInvoice(result.invoice);
@@ -61,7 +53,7 @@ export default function SettlementForm({ invoice }: SettlementFormProps) {
           </div>
           <div>
             <dt className="text-muted-foreground">payment date</dt>
-            <dd className="font-medium">{formatDate(currentInvoice.externalPaymentDate)}</dd>
+            <dd className="font-medium">{currentInvoice.externalPaymentDate ? formatInvoiceDateTime(currentInvoice.externalPaymentDate) : 'not available'}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">amount</dt>

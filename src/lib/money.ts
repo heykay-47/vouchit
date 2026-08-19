@@ -25,4 +25,11 @@ export const formatPaiseAsRupees = (paise: number): string => {
   return `${rupees.toLocaleString('en-IN')}.${paisePart}`;
 };
 
+export const formatPaiseAsRupeesInput = (paise: number): string => {
+  assertSafePaise(paise);
+  const rupees = Math.floor(paise / 100);
+  const paisePart = String(paise % 100).padStart(2, '0');
+  return `${rupees}.${paisePart}`;
+};
+
 export const formatPaiseAsInr = (paise: number): string => `₹${formatPaiseAsRupees(paise)}`;

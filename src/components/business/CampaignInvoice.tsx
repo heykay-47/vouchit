@@ -1,15 +1,10 @@
 import type { Invoice } from '@/lib/types';
+import { formatInvoiceDate } from '@/lib/invoice-dates';
 import { formatPaiseAsInr } from '@/lib/money';
 
 interface CampaignInvoiceProps {
   invoice: Invoice;
 }
-
-const formatDate = (date: Date) => date.toLocaleDateString('en-IN', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-});
 
 export default function CampaignInvoice({ invoice }: CampaignInvoiceProps) {
   return (
@@ -57,7 +52,7 @@ export default function CampaignInvoice({ invoice }: CampaignInvoiceProps) {
         </div>
         <div>
           <dt className="text-muted-foreground">issued</dt>
-          <dd className="font-medium">{formatDate(invoice.issuedAt)}</dd>
+          <dd className="font-medium">{formatInvoiceDate(invoice.issuedAt)}</dd>
         </div>
       </dl>
     </section>

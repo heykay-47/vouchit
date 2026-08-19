@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPaiseAsInr, parseRupeesToPaise } from './money';
+import { formatPaiseAsInr, formatPaiseAsRupeesInput, parseRupeesToPaise } from './money';
 
 describe('money helpers', () => {
   it('parses rupees into exact integer paise without floating-point multiplication', () => {
@@ -15,5 +15,12 @@ describe('money helpers', () => {
   it('formats paise as INR using exact integer rupees and paise', () => {
     expect(formatPaiseAsInr(10100)).toBe('₹101.00');
     expect(formatPaiseAsInr(123456)).toBe('₹1,234.56');
+  });
+
+  it('formats a machine-editable settlement value without grouping separators', () => {
+    const inputValue = formatPaiseAsRupeesInput(101000);
+
+    expect(inputValue).toBe('1010.00');
+    expect(parseRupeesToPaise(inputValue)).toBe(101000);
   });
 });

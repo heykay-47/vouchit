@@ -16,9 +16,9 @@ export default function BusinessInvoices() {
       {query.error ? <p role="alert" className="break-words text-sm text-destructive">unable to load invoices</p> : null}
       {query.isLoading ? <p className="text-sm text-muted-foreground">loading invoices...</p> : null}
       {!query.isLoading && !query.error ? <InvoiceList invoices={invoices} /> : null}
-      {!query.isLoading && !query.error && invoices.some((invoice) => invoice.status === 'issued') ? (
-        <div className="space-y-4" aria-label="invoice settlements">
-          {invoices.filter((invoice) => invoice.status === 'issued').map((invoice) => (
+      {!query.isLoading && !query.error && invoices.length > 0 ? (
+        <div className="space-y-4" aria-label="invoice payment records">
+          {invoices.map((invoice) => (
             <div key={invoice.id} className="rounded-lg border border-border bg-card p-5 sm:p-6">
               <SettlementForm invoice={invoice} />
             </div>
