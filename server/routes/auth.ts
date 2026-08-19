@@ -7,16 +7,28 @@ import { hashPassword } from '../lib/password.js';
 import { clearAuthCookie, createAuthCookie, signAuthToken } from '../lib/token.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { toUserResponse } from '../lib/serializers.js';
+import { withTransaction } from '../lib/transaction.js';
+import { BusinessProfile } from '../models/BusinessProfile.js';
 import { User } from '../models/User.js';
 
 const router = Router();
 
-const signupSchema = z.object({
+const baseSignup = z.object({
   email: z.string().email().transform((value) => value.toLowerCase().trim()),
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/),
   password: z.string().min(8).max(72),
   rememberMe: z.boolean().optional().default(false),
-}).strict();
+});
+
+const signupSchema = z.discriminatedUnion('role', [
+  baseSignup.extend({ role: z.literal('customer') }).strict(),
+  baseSignup.extend({
+    role: z.literal('business'),
+    organizationName: z.string().trim().min(1).max(120),
+    contactName: z.string().trim().min(1).max(120),
+    website: z.string().url().refine((value) => value.startsWith('https://')).optional(),
+  }).strict(),
+]);
 
 const loginSchema = z.object({
   email: z.string().email().transform((value) => value.toLowerCase().trim()),
@@ -37,23 +49,38 @@ router.post('/signup', asyncRoute(async (req, res) => {
     throw new ApiError(409, 'An account with this email already exists');
   }
 
-  let user;
-  try {
-    user = await User.create({
-      email: input.email,
-      username: input.username,
-      passwordHash: await hashPassword(input.password),
-    });
-  } catch (error) {
-    if ((error as { code?: number }).code === 11000) {
-      throw new ApiError(409, 'An account with this email already exists');
+  const user = await withTransaction(async (session) => {
+    let createdUser;
+    try {
+      createdUser = await User.create({
+        email: input.email,
+        username: input.username,
+        role: input.role,
+        passwordHash: await hashPassword(input.password),
+      }, { session });
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) {
+        throw new ApiError(409, 'An account with this email already exists');
+      }
+      throw error;
     }
-    throw error;
-  }
+
+    if (input.role === 'business') {
+      await BusinessProfile.create({
+        userId: createdUser._id,
+        organizationName: input.organizationName,
+        contactName: input.contactName,
+        website: input.website,
+      }, { session });
+    }
+
+    return createdUser;
+  });
 
   const token = signAuthToken({ userId: user._id.toString() }, input.rememberMe ? '7d' : '12h');
+  const userResponse = await toUserResponse(user);
   res.setHeader('Set-Cookie', createAuthCookie(token, input.rememberMe));
-  ok(res, { user: await toUserResponse(user) }, 201);
+  ok(res, { user: userResponse }, 201);
 }));
 
 router.post('/login', asyncRoute(async (req, res) => {

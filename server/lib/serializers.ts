@@ -1,5 +1,6 @@
 import { Favorite } from '../models/Favorite.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
+import { resolveUserRole } from './roles.js';
 
 export const toUserResponse = async (user: any) => {
   const userId = user._id.toString();
@@ -12,6 +13,7 @@ export const toUserResponse = async (user: any) => {
     id: userId,
     email: user.email,
     username: user.username,
+    role: resolveUserRole(user.role),
     bio: user.bio ?? undefined,
     profileImage: user.profileImage ?? undefined,
     notificationPreferences: user.notificationPreferences,
