@@ -30,6 +30,9 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
 
   const hasExpired = voucher.expiryDate ? new Date(voucher.expiryDate) < new Date() : false;
   const canUseCustomerActions = !user || user.role === 'customer';
+  const canViewCode = isAuthenticated && !!voucher.code && (
+    voucher.sourceType !== 'campaign' || user?.id === voucher.redeemedBy
+  );
   const isRedeemable = canUseCustomerActions && !hasAvailabilityConflict && !voucher.isRedeemed && voucher.isActive && !hasExpired && user?.id !== voucher.donatedBy;
   const isOwnRedeemedVoucher = user?.id === voucher.redeemedBy;
   
@@ -43,6 +46,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   
   const daysUntilExpiry = getDaysUntilExpiry();
   const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 3;
+  const campaignAttribution = voucher.sourceType === 'campaign' ? voucher.campaign : undefined;
   
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -166,7 +170,16 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
         >
           {/* Header */}
           <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
-            <span className="min-w-0 break-words text-xs text-muted-foreground">{voucher.platform}</span>
+            <div className="min-w-0">
+              <span className="block break-words text-xs text-muted-foreground">{voucher.platform}</span>
+              {campaignAttribution && (
+                <p className="mt-1 flex flex-wrap gap-x-1 text-[11px] text-muted-foreground">
+                  <span>business campaign</span>
+                  <span>{campaignAttribution.organizationName}</span>
+                  <span>{campaignAttribution.brandName}</span>
+                </p>
+              )}
+            </div>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs lowercase ${status.color}`}>{status.label}</span>
           </div>
 
@@ -209,6 +222,13 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
           <DialogDescription className="break-words">
             {voucher.platform} • {status.label}
           </DialogDescription>
+          {campaignAttribution && (
+            <div className="flex flex-wrap gap-x-1 text-xs text-muted-foreground">
+              <span>business campaign</span>
+              <span>{campaignAttribution.organizationName}</span>
+              <span>{campaignAttribution.brandName}</span>
+            </div>
+          )}
         </DialogHeader>
           
           <div className="space-y-4">
@@ -250,7 +270,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
             <div className="space-y-2 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-4">
                 <span className="text-muted-foreground lowercase">code</span>
-                {isAuthenticated && voucher.code ? (
+                {canViewCode ? (
                   <button
                     type="button"
                     aria-label={`copy code ${voucher.code}`}

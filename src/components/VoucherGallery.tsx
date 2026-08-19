@@ -88,8 +88,10 @@ export default function VoucherGallery({
       filtered = filtered.filter(v => 
         v.title.toLowerCase().includes(query) || 
         v.description.toLowerCase().includes(query) ||
-        v.code.toLowerCase().includes(query) ||
-        v.platform.toLowerCase().includes(query)
+        v.code?.toLowerCase().includes(query) ||
+        v.platform.toLowerCase().includes(query) ||
+        v.campaign?.brandName.toLowerCase().includes(query) ||
+        v.campaign?.organizationName.toLowerCase().includes(query)
       );
     }
     

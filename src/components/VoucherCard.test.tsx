@@ -55,6 +55,19 @@ const voucher: Voucher = {
   isActive: true,
 };
 
+const campaignVoucher = {
+  ...voucher,
+  id: 'campaign-voucher-1',
+  title: 'Business Weekend Reward',
+  sourceType: 'campaign',
+  code: 'CAMPAIGN50',
+  campaign: {
+    campaignId: 'campaign-1',
+    brandName: 'Acme Rewards',
+    organizationName: 'Acme Offers',
+  },
+} as unknown as Voucher;
+
 const authenticatedUser = {
   id: 'user-1',
   email: 'user@example.com',
@@ -107,6 +120,32 @@ describe('VoucherCard', () => {
     expect(trigger).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('attributes campaign supply without changing community cards', async () => {
+    const user = setupUser();
+    const communityVoucher = { ...voucher, sourceType: 'community' } as Voucher;
+    render(<><VoucherCard voucher={campaignVoucher} /><VoucherCard voucher={communityVoucher} /></>);
+
+    expect(screen.getByText('business campaign')).toBeInTheDocument();
+    expect(screen.getByText('Acme Offers')).toBeInTheDocument();
+    expect(screen.getByText('Acme Rewards')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /view details/i })).toHaveLength(2);
+
+    await user.click(screen.getByRole('button', { name: /Business Weekend Reward.*view details/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('business campaign');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Acme Offers');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Acme Rewards');
+  });
+
+  it('masks a campaign code when the client does not receive it', async () => {
+    const user = setupUser();
+    render(<VoucherCard voucher={{ ...campaignVoucher, code: undefined } as unknown as Voucher} />);
+
+    await user.click(screen.getByRole('button', { name: /view details$/ }));
+
+    expect(screen.getByText('••••••••')).toBeInTheDocument();
+    expect(screen.queryByText('CAMPAIGN50')).not.toBeInTheDocument();
   });
 
   it('restores trigger focus on close and reopens with Space', async () => {
@@ -343,11 +382,14 @@ describe('VoucherCard', () => {
     const user = setupUser();
     const businessUser = { ...authenticatedUser, id: 'business-1', role: 'business' as const };
     mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: businessUser });
-    render(<VoucherCard voucher={voucher} />);
+    render(<VoucherCard voucher={campaignVoucher} />);
 
     await user.click(screen.getByRole('button', { name: /view details$/ }));
 
-    expect(screen.getByText(voucher.code)).toBeInTheDocument();
+    expect(screen.getByText('••••••••')).toBeInTheDocument();
+    expect(screen.queryByText(campaignVoucher.code as string)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText('business campaign')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText('Acme Offers')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'redeem voucher' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'sign in to redeem' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'not working' })).not.toBeInTheDocument();

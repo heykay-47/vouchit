@@ -1,6 +1,13 @@
 export type VoucherPlatform = 'Google Pay' | 'Paytm' | 'PhonePe' | 'Other';
 export type VoucherCategory = 'Food' | 'Shopping' | 'Travel' | 'Entertainment' | 'Electronics' | 'Health' | 'Other';
 export type UserRole = 'customer' | 'business';
+export type VoucherSourceType = 'community' | 'campaign';
+
+export interface CampaignVoucherAttribution {
+  campaignId: string;
+  brandName: string;
+  organizationName: string;
+}
 
 export type CampaignStatus = 'draft' | 'awaiting_payment' | 'active' | 'completed';
 export type CampaignCompletionReason = 'claimed' | 'expired';
@@ -47,10 +54,12 @@ export interface NotificationPreferences {
 
 export interface Voucher {
   id: string;
+  sourceType?: VoucherSourceType;
+  campaign?: CampaignVoucherAttribution;
   platform: VoucherPlatform;
   title: string;
   description: string;
-  code: string;
+  code?: string;
   imageUrl: string; // URL to the screenshot
   expiryDate?: Date;
   value?: string;
@@ -63,6 +72,8 @@ export interface Voucher {
   isActive: boolean; // False if reportCount >= 5 or manually deactivated
   category?: VoucherCategory;
 }
+
+export type ResolvedVoucher = Omit<Voucher, 'sourceType'> & { sourceType: VoucherSourceType };
 
 export interface Campaign {
   id: string;

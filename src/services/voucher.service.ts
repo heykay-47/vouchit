@@ -1,11 +1,14 @@
-import { Voucher } from '@/lib/types';
+import { ResolvedVoucher, Voucher, VoucherSourceType } from '@/lib/types';
 import { apiRequest } from './api-client';
 
+type VoucherDto = Omit<Voucher, 'sourceType'> & { sourceType?: VoucherSourceType };
+
 export const voucherService = {
-  async list() {
-    const { vouchers } = await apiRequest<{ vouchers: Voucher[] }>('/api/vouchers');
+  async list(): Promise<ResolvedVoucher[]> {
+    const { vouchers } = await apiRequest<{ vouchers: VoucherDto[] }>('/api/vouchers');
     return vouchers.map((voucher) => ({
       ...voucher,
+      sourceType: voucher.sourceType ?? 'community',
       donatedAt: new Date(voucher.donatedAt),
       expiryDate: voucher.expiryDate ? new Date(voucher.expiryDate) : undefined,
       redeemedAt: voucher.redeemedAt ? new Date(voucher.redeemedAt) : undefined,
