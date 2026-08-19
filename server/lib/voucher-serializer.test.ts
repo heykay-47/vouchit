@@ -67,10 +67,26 @@ describe('voucher serializer', () => {
     expect(toVoucherResponse(baseVoucher)).not.toHaveProperty('campaign');
   });
 
-  it('shows a campaign business owner the campaign voucher code', () => {
+  it('does not expose campaign codes through the generic serializer to the business owner', () => {
     const response = toVoucherResponse(
       { ...baseVoucher, sourceType: 'campaign', campaignId },
       donorId,
+      { campaign: { _id: campaignId, businessId: donorId, brandName: 'Fresh Market' } },
+    );
+
+    expect(response.code).toBeUndefined();
+  });
+
+  it('shows a claimed campaign code to the claiming customer', () => {
+    const response = toVoucherResponse(
+      {
+        ...baseVoucher,
+        sourceType: 'campaign',
+        campaignId,
+        redeemedBy: customerId,
+        isRedeemed: true,
+      },
+      customerId,
       { campaign: { _id: campaignId, businessId: donorId, brandName: 'Fresh Market' } },
     );
 

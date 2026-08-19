@@ -89,9 +89,13 @@ vi.mock('../models/Voucher', () => {
 });
 vi.mock('../models/Campaign', () => ({
   Campaign: {
-    find: vi.fn((filter: any) => ({
-      lean: async () => campaigns.filter((campaign) => matchesFilter(campaign, filter)),
-    })),
+    find: vi.fn((filter: any) => {
+      const chain = {
+        select: () => chain,
+        lean: async () => campaigns.filter((campaign) => matchesFilter(campaign, filter)),
+      };
+      return chain;
+    }),
     findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
       const campaign = campaigns.find((item) => item._id.toString() === filter._id.toString()
         && item.status === filter.status);
@@ -443,6 +447,66 @@ describe('voucher routes', () => {
     });
     expect(res.body.data.vouchers[0].code).toBeUndefined();
     expect(BusinessProfile.find).toHaveBeenCalledWith({ _id: { $in: [campaign.businessProfileId.toString()] } });
+    expect(Campaign.find).toHaveBeenNthCalledWith(2, { _id: { $in: [campaign._id.toString()] } });
+  });
+
+  it('does not expose campaign history to its owning business through the generic list', async () => {
+    const ownerId = '507f1f77bcf86cd799439099';
+    const unpaidCampaign = {
+      _id: { toString: () => '507f1f77bcf86cd799439013' },
+      businessId: ownerId,
+      status: 'awaiting_payment',
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+    };
+    const inactiveCampaign = {
+      _id: { toString: () => '507f1f77bcf86cd799439014' },
+      businessId: ownerId,
+      status: 'active',
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+    };
+    const expiredCampaign = {
+      _id: { toString: () => '507f1f77bcf86cd799439015' },
+      businessId: ownerId,
+      status: 'active',
+      expiryDate: new Date('2026-08-18T00:00:00.000Z'),
+    };
+    campaigns.push(unpaidCampaign, inactiveCampaign, expiredCampaign);
+    vouchers.push(
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439016' },
+        sourceType: 'campaign',
+        campaignId: unpaidCampaign._id,
+        donatedBy: ownerId,
+        code: 'UNPAID-SECRET',
+        isActive: false,
+        isRedeemed: false,
+      },
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439017' },
+        sourceType: 'campaign',
+        campaignId: inactiveCampaign._id,
+        donatedBy: ownerId,
+        code: 'INACTIVE-SECRET',
+        isActive: false,
+        isRedeemed: false,
+      },
+      {
+        _id: { toString: () => '507f1f77bcf86cd799439018' },
+        sourceType: 'campaign',
+        campaignId: expiredCampaign._id,
+        donatedBy: ownerId,
+        code: 'EXPIRED-SECRET',
+        isActive: true,
+        isRedeemed: false,
+      },
+    );
+
+    const res = await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: ownerId }, '1h')}`])
+      .expect(200);
+
+    expect(res.body.data.vouchers).toEqual([]);
   });
 
   it('rejects a stale campaign voucher claim using the atomic expiry predicate', async () => {

@@ -40,11 +40,23 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   const { limit, offset } = listSchema.parse(req.query);
   const viewerId = getOptionalUserId(req);
   const now = new Date();
-  const activeCampaigns = await Campaign.find({ status: 'active', expiryDate: { $gt: now } }).lean();
+  const activeCampaigns = await Campaign
+    .find({ status: 'active', expiryDate: { $gt: now } })
+    .select('_id')
+    .lean();
   const activeCampaignIds = activeCampaigns.map((campaign: any) => campaign._id.toString());
   const publicFilter = publicVoucherFilter(activeCampaignIds, now);
+  const communityHistoryFilter = {
+    $or: [{ sourceType: 'community' }, { sourceType: { $exists: false } }],
+  };
   const query = viewerId
-    ? { $or: [publicFilter, { donatedBy: viewerId }, { redeemedBy: viewerId }] }
+    ? {
+        $or: [
+          publicFilter,
+          { $and: [communityHistoryFilter, { donatedBy: viewerId }] },
+          { $and: [communityHistoryFilter, { redeemedBy: viewerId }] },
+        ],
+      }
     : publicFilter;
   const vouchers = await Voucher
     .find(query)
@@ -55,11 +67,10 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   const referencedCampaignIds = [...new Set(vouchers
     .filter((voucher: any) => voucher.sourceType === 'campaign' && voucher.campaignId)
     .map((voucher: any) => voucher.campaignId.toString()))];
-  const missingCampaignIds = referencedCampaignIds.filter((id) => !activeCampaignIds.includes(id));
-  const historicalCampaigns = missingCampaignIds.length > 0
-    ? await Campaign.find({ _id: { $in: missingCampaignIds } }).lean()
+  const referencedCampaigns = referencedCampaignIds.length > 0
+    ? await Campaign.find({ _id: { $in: referencedCampaignIds } }).lean()
     : [];
-  const campaignMap = new Map<string, any>([...activeCampaigns, ...historicalCampaigns]
+  const campaignMap = new Map<string, any>(referencedCampaigns
     .map((campaign: any) => [campaign._id.toString(), campaign]));
   const profileIds = [...new Set([...campaignMap.values()]
     .filter((campaign) => campaign.businessProfileId)

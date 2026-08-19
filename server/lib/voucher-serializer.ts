@@ -72,11 +72,9 @@ export const toVoucherResponse = (
   const sourceType = voucher.sourceType === 'campaign' ? 'campaign' : 'community';
   const donatedBy = toId(voucher.donatedBy);
   const redeemedBy = toId(voucher.redeemedBy);
-  const campaignBusinessId = toId(attribution.campaign?.businessId);
   const canViewCode = !!viewerId && (
-    donatedBy === viewerId
-    || redeemedBy === viewerId
-    || campaignBusinessId === viewerId
+    redeemedBy === viewerId
+    || (sourceType !== 'campaign' && donatedBy === viewerId)
   );
   const campaignId = toId(voucher.campaignId ?? attribution.campaign?._id);
 
