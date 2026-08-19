@@ -24,6 +24,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
 const BusinessDashboard = lazy(() => import("./pages/business/BusinessDashboard"));
+const CampaignWorkspace = lazy(() => import("./pages/business/CampaignWorkspace"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Error Boundary Component
@@ -137,6 +138,9 @@ const App = () => (
                         <Route path="/donate" element={<RoleRoute role="customer"><Donate /></RoleRoute>} />
                         <Route path="/dashboard" element={<RoleRoute role="customer"><Dashboard /></RoleRoute>} />
                         <Route path="/business" element={<RoleRoute role="business"><BusinessDashboard /></RoleRoute>} />
+                        <Route path="/business/campaigns" element={<RoleRoute role="business"><BusinessDashboard /></RoleRoute>} />
+                        <Route path="/business/campaigns/new" element={<RoleRoute role="business"><CampaignWorkspace /></RoleRoute>} />
+                        <Route path="/business/campaigns/:id" element={<RoleRoute role="business"><CampaignWorkspace /></RoleRoute>} />
                         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                         <Route path="/about" element={<About />} />
                         <Route path="/community" element={<Community />} />

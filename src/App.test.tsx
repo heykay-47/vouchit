@@ -19,6 +19,7 @@ vi.mock('./pages/Browse', () => ({
 vi.mock('./pages/Dashboard', () => ({ default: () => <div>dashboard page</div> }));
 vi.mock('./pages/Donate', () => ({ default: () => <div>donate page</div> }));
 vi.mock('./pages/business/BusinessDashboard', () => ({ default: () => <div>business dashboard page</div> }));
+vi.mock('./pages/business/CampaignWorkspace', () => ({ default: () => <div>campaign workspace page</div> }));
 vi.mock('./pages/Settings', () => ({ default: () => <div>settings page</div> }));
 vi.mock('./pages/About', () => ({ default: () => <div>about page</div> }));
 vi.mock('./pages/Community', () => ({ default: () => <div>community page</div> }));
@@ -110,6 +111,30 @@ describe('App route layouts', () => {
     render(<App />);
 
     expect(await screen.findByText('business dashboard page')).toBeInTheDocument();
+  });
+
+  it('renders business campaign routes for businesses', async () => {
+    authState.user = {
+      id: 'business-1',
+      email: 'business@example.com',
+      username: 'business',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      role: 'business',
+      redeemedVouchers: [],
+    };
+    window.history.pushState({}, '', '/business/campaigns/new');
+    const { unmount } = render(<App />);
+    expect(await screen.findByText('campaign workspace page')).toBeInTheDocument();
+    unmount();
+
+    window.history.pushState({}, '', '/business/campaigns');
+    const dashboardRoute = render(<App />);
+    expect(await screen.findByText('business dashboard page')).toBeInTheDocument();
+    dashboardRoute.unmount();
+
+    window.history.pushState({}, '', '/business/campaigns/campaign-1');
+    render(<App />);
+    expect(await screen.findByText('campaign workspace page')).toBeInTheDocument();
   });
 
   it('redirects a customer away from the business route', async () => {
