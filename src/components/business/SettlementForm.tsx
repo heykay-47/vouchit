@@ -30,7 +30,7 @@ export default function SettlementForm({ invoice }: SettlementFormProps) {
         input: {
           amountPaise: parseRupeesToPaise(amount),
           externalPaymentReference: reference.trim(),
-          externalPaymentDate: toSettlementDateTime(paymentDate),
+          externalPaymentDate: toSettlementDateTime(paymentDate, new Date(), invoice.issuedAt),
         },
       });
       setSettledInvoice(result.invoice);

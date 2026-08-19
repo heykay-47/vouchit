@@ -11,12 +11,36 @@ export const formatInvoiceDateTime = (date: Date): string => date.toLocaleString
   timeZone: 'UTC',
 });
 
-export const toSettlementDateTime = (dateValue: string, now = new Date()): string => {
+const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+export const getCalendarDate = (date: Date, timeZone = localTimeZone()): string => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date).reduce<Record<string, string>>((result, part) => {
+    if (part.type !== 'literal') result[part.type] = part.value;
+    return result;
+  }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
+export const toSettlementDateTime = (
+  dateValue: string,
+  now = new Date(),
+  issuedAt?: Date,
+  timeZone = localTimeZone(),
+): string => {
   const selectedDate = new Date(`${dateValue}T00:00:00.000Z`);
   if (Number.isNaN(selectedDate.getTime()) || !/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
     throw new Error('payment date is invalid');
   }
 
-  if (dateValue === now.toISOString().slice(0, 10)) return now.toISOString();
-  return new Date(`${dateValue}T23:59:59.999Z`).toISOString();
+  const candidate = dateValue === getCalendarDate(now, timeZone)
+    ? now
+    : new Date(`${dateValue}T23:59:59.999Z`);
+  const validDate = issuedAt && candidate.getTime() < issuedAt.getTime() ? issuedAt : candidate;
+  return validDate.toISOString();
 };
