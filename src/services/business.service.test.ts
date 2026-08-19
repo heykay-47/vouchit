@@ -4,6 +4,7 @@ import { businessService } from './business.service';
 import type {
   CampaignDraftInput,
   CampaignInventoryCandidate,
+  CampaignInventoryRejection,
   CampaignWorkspace,
   SettlementInput,
 } from '@/lib/types';
@@ -28,6 +29,11 @@ const draftInput: CampaignDraftInput = {
 const rows: CampaignInventoryCandidate[] = [
   { sourceRow: 2, code: 'SAVE50', value: '₹50' },
 ];
+
+const blankCodeRejection: CampaignInventoryRejection = {
+  sourceRow: 3,
+  reason: 'Code is required',
+};
 
 const campaignDates = {
   expiryDate: '2026-09-01T00:00:00.000Z',
@@ -91,7 +97,9 @@ describe('business service', () => {
       .mockResolvedValueOnce({ campaign: apiWorkspace })
       .mockResolvedValueOnce({ campaign: apiWorkspace })
       .mockResolvedValueOnce({ campaign: apiWorkspace })
-      .mockResolvedValueOnce({ preview: { accepted: rows, rejected: [], totalRows: 1 } })
+      .mockResolvedValueOnce({
+        preview: { accepted: rows, rejected: [blankCodeRejection], totalRows: 2 },
+      })
       .mockResolvedValueOnce({ campaign: apiWorkspace })
       .mockResolvedValueOnce({ invoice: apiInvoice })
       .mockResolvedValueOnce({ invoices: [apiInvoice] })
@@ -117,7 +125,11 @@ describe('business service', () => {
     expectHydratedWorkspace(created);
     expectHydratedWorkspace(fetched);
     expectHydratedWorkspace(updated);
-    expect(preview).toEqual({ accepted: rows, rejected: [], totalRows: 1 });
+    expect(preview).toEqual({
+      accepted: rows,
+      rejected: [{ sourceRow: 3, reason: 'Code is required' }],
+      totalRows: 2,
+    });
     expectHydratedWorkspace(replaced);
     expect(issued.issuedAt).toEqual(new Date(apiInvoice.issuedAt));
     expect(invoices[0].issuedAt).toEqual(new Date(apiInvoice.issuedAt));

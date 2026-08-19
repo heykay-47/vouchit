@@ -65,7 +65,11 @@ export const toBusinessVoucherResponse = (voucher: BusinessVoucherInput) => ({
   viewCount: voucher.viewCount ?? 0,
 });
 
-export const toCampaignResponse = (campaign: CampaignInput, now = new Date()) => {
+export const toCampaignResponse = (
+  campaign: CampaignInput,
+  organizationName: string,
+  now = new Date(),
+) => {
   const isExpired = campaign.status === 'active'
     && new Date(campaign.expiryDate).getTime() <= now.getTime();
   const effectiveStatus = isExpired ? 'completed' : campaign.status;
@@ -77,6 +81,7 @@ export const toCampaignResponse = (campaign: CampaignInput, now = new Date()) =>
     id: toId(campaign._id),
     businessId: toId(campaign.businessId),
     businessProfileId: toId(campaign.businessProfileId),
+    organizationName,
     title: campaign.title,
     brandName: campaign.brandName,
     description: campaign.description,

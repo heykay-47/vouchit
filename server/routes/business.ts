@@ -10,7 +10,7 @@ import { toCampaignResponse } from '../lib/business-serializers.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { withTransaction } from '../lib/transaction.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
-import { BusinessProfile } from '../models/BusinessProfile.js';
+import { BusinessProfile, type BusinessProfileDocument } from '../models/BusinessProfile.js';
 import { Campaign, type CampaignDocument } from '../models/Campaign.js';
 import { Voucher } from '../models/Voucher.js';
 
@@ -64,14 +64,29 @@ const userIdFrom = (req: AuthedRequest) => req.userId;
 
 const idFor = (value: unknown) => value?.toString?.() ?? String(value);
 
-const campaignWorkspace = async (campaign: CampaignDocument) => {
+const requireBusinessProfile = async (businessId: string) => {
+  const profile = await BusinessProfile.findOne({ userId: businessId });
+  if (!profile) {
+    throw new ApiError(404, 'Business profile not found');
+  }
+  return profile;
+};
+
+const campaignWorkspace = async (
+  campaign: CampaignDocument,
+  profile: BusinessProfileDocument,
+) => {
+  if (idFor(campaign.businessProfileId) !== idFor(profile._id)) {
+    throw new ApiError(404, 'Business profile not found');
+  }
+
   const inventoryCount = await Voucher.countDocuments({
     campaignId: campaign._id,
     sourceType: 'campaign',
   });
 
   return {
-    ...toCampaignResponse(campaign),
+    ...toCampaignResponse(campaign, profile.organizationName),
     inventoryCount,
     invoice: null,
     analytics: null,
@@ -116,17 +131,19 @@ router.get('/campaigns', asyncRoute(async (req, res) => {
   await connectDb();
   const businessId = userIdFrom(req as AuthedRequest);
   const campaigns = await Campaign.find({ businessId }).sort({ createdAt: -1 }).lean();
-  ok(res, { campaigns: await Promise.all(campaigns.map(campaignWorkspace)) });
+  const profile = campaigns.length > 0 ? await requireBusinessProfile(businessId) : null;
+  ok(res, {
+    campaigns: profile
+      ? await Promise.all(campaigns.map((campaign) => campaignWorkspace(campaign, profile)))
+      : [],
+  });
 }));
 
 router.post('/campaigns', asyncRoute(async (req, res) => {
   await connectDb();
   const input = campaignSchema.parse(req.body);
   const businessId = userIdFrom(req as AuthedRequest);
-  const profile = await BusinessProfile.findOne({ userId: businessId });
-  if (!profile) {
-    throw new ApiError(404, 'Business profile not found');
-  }
+  const profile = await requireBusinessProfile(businessId);
 
   const campaign = await Campaign.create({
     ...input,
@@ -136,18 +153,20 @@ router.post('/campaigns', asyncRoute(async (req, res) => {
     lockedAt: null,
   });
 
-  ok(res, { campaign: await campaignWorkspace(campaign) }, 201);
+  ok(res, { campaign: await campaignWorkspace(campaign, profile) }, 201);
 }));
 
 router.get('/campaigns/:id', asyncRoute(async (req, res) => {
   const campaign = await requireOwnedCampaign(req as AuthedRequest);
-  ok(res, { campaign: await campaignWorkspace(campaign) });
+  const profile = await requireBusinessProfile(idFor(campaign.businessId));
+  ok(res, { campaign: await campaignWorkspace(campaign, profile) });
 }));
 
 router.patch('/campaigns/:id', asyncRoute(async (req, res) => {
   const authedReq = req as AuthedRequest;
   const campaign = await requireOwnedCampaign(authedReq);
   requireDraft(campaign);
+  const profile = await requireBusinessProfile(authedReq.userId);
   const input = campaignPatchSchema.parse(req.body);
   const updated = await withTransaction(async (session) => {
     const current = await Campaign.findOneAndUpdate(
@@ -167,7 +186,7 @@ router.patch('/campaigns/:id', asyncRoute(async (req, res) => {
     throw new ApiError(404, 'Campaign not found');
   }
 
-  ok(res, { campaign: await campaignWorkspace(updated) });
+  ok(res, { campaign: await campaignWorkspace(updated, profile) });
 }));
 
 router.post('/campaigns/:id/inventory/preview', asyncRoute(async (req, res) => {
@@ -185,6 +204,8 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
   const authedReq = req as AuthedRequest;
   const campaign = await requireOwnedCampaign(authedReq);
   requireDraft(campaign);
+  const businessId = userIdFrom(authedReq);
+  const profile = await requireBusinessProfile(businessId);
   const { rows } = confirmationSchema.parse(req.body) as { rows: CampaignInventoryCandidate[] };
   const preview = previewCampaignInventory({ headers: ['code', 'value'], rows });
 
@@ -197,7 +218,6 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
   }
 
   const campaignId = req.params.id;
-  const businessId = userIdFrom(authedReq);
   const current = await withTransaction(async (session) => {
     const currentCampaign = await Campaign.findOneAndUpdate(
       draftCampaignFilter(campaignId, businessId),
@@ -226,7 +246,7 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
     return currentCampaign;
   });
 
-  ok(res, { campaign: await campaignWorkspace(current) });
+  ok(res, { campaign: await campaignWorkspace(current, profile) });
 }));
 
 export { router as businessRouter };

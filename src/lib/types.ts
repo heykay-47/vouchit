@@ -133,13 +133,15 @@ export interface CampaignInventoryCandidate {
   value?: string;
 }
 
-export interface CampaignInventoryRejectedRow extends CampaignInventoryCandidate {
+export interface CampaignInventoryRejection {
+  sourceRow: number;
+  code?: string;
   reason: string;
 }
 
 export interface CampaignInventoryPreview {
   accepted: CampaignInventoryCandidate[];
-  rejected: CampaignInventoryRejectedRow[];
+  rejected: CampaignInventoryRejection[];
   totalRows: number;
 }
 

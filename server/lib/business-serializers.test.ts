@@ -63,8 +63,13 @@ describe('business serializers', () => {
       updatedAt: new Date('2026-08-01T00:00:00.000Z'),
     };
 
-    const response = toCampaignResponse(campaign, new Date('2026-08-19T00:00:00.000Z'));
+    const response = toCampaignResponse(
+      campaign,
+      'Fresh Market Ltd',
+      new Date('2026-08-19T00:00:00.000Z'),
+    );
 
+    expect(response.organizationName).toBe('Fresh Market Ltd');
     expect(response.status).toBe('active');
     expect(response.effectiveStatus).toBe('completed');
     expect(response.completionReason).toBe('expired');

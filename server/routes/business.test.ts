@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 import { withTransaction } from '../lib/transaction.js';
+import { BusinessProfile } from '../models/BusinessProfile.js';
 import { Campaign } from '../models/Campaign.js';
 import { Voucher } from '../models/Voucher.js';
 
@@ -13,6 +14,8 @@ const campaignId = '507f1f77bcf86cd799439013';
 const session = { id: 'transaction-session' };
 const campaigns: Record<string, unknown>[] = [];
 const vouchers: Record<string, unknown>[] = [];
+const organizationName = 'Fresh Market Ltd';
+let businessProfile: Record<string, unknown> | null;
 
 const chain = (value: unknown) => {
   const query = {
@@ -44,7 +47,7 @@ vi.mock('../models/User', () => ({
 }));
 vi.mock('../models/BusinessProfile', () => ({
   BusinessProfile: {
-    findOne: vi.fn(async () => ({ _id: profileId })),
+    findOne: vi.fn(async () => businessProfile),
   },
 }));
 vi.mock('../models/Campaign', () => ({
@@ -130,6 +133,7 @@ describe('business routes', () => {
     process.env.JWT_SECRET = 'test-secret';
     campaigns.length = 0;
     vouchers.length = 0;
+    businessProfile = { _id: profileId, userId: businessId, organizationName };
     vi.clearAllMocks();
   });
 
@@ -152,6 +156,7 @@ describe('business routes', () => {
     expect(createResponse.body.data.campaign).toMatchObject({
       id: campaignId,
       businessId,
+      organizationName,
       status: 'draft',
       inventoryCount: 0,
       invoice: null,
@@ -164,7 +169,51 @@ describe('business routes', () => {
       .expect(200);
 
     expect(listResponse.body.data.campaigns).toHaveLength(1);
+    expect(listResponse.body.data.campaigns[0].organizationName).toBe(organizationName);
     expect(Campaign.find).toHaveBeenCalledWith({ businessId });
+  });
+
+  it('uses one bounded profile lookup when listing multiple campaigns', async () => {
+    seedCampaign();
+    seedCampaign({ _id: { toString: () => '507f1f77bcf86cd799439014' } });
+
+    const response = await request(createApp())
+      .get('/api/business/campaigns')
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(200);
+
+    expect(response.body.data.campaigns).toHaveLength(2);
+    expect(response.body.data.campaigns.map((campaign: { organizationName: string }) => campaign.organizationName))
+      .toEqual([organizationName, organizationName]);
+    expect(BusinessProfile.findOne).toHaveBeenCalledOnce();
+    expect(BusinessProfile.findOne).toHaveBeenCalledWith({ userId: businessId });
+  });
+
+  it('returns a safe error when an owned campaign has no business profile', async () => {
+    seedCampaign();
+    businessProfile = null;
+
+    const response = await request(createApp())
+      .get(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+  });
+
+  it('does not mutate an owned campaign when its business profile is missing', async () => {
+    const campaign = seedCampaign();
+    businessProfile = null;
+
+    const response = await request(createApp())
+      .patch(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ ...validCampaign, title: 'Unsafe update' })
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+    expect(campaign.title).toBe(validCampaign.title);
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it('returns 404 before 403 for missing and non-owned campaigns', async () => {
@@ -190,6 +239,7 @@ describe('business routes', () => {
       .set('Cookie', [`auth_token=${tokenFor()}`])
       .expect(200);
     expect(getResponse.body.data.campaign.inventoryCount).toBe(0);
+    expect(getResponse.body.data.campaign.organizationName).toBe(organizationName);
 
     const updateResponse = await request(createApp())
       .patch(`/api/business/campaigns/${campaignId}`)
@@ -198,6 +248,7 @@ describe('business routes', () => {
       .expect(200);
 
     expect(updateResponse.body.data.campaign.title).toBe('Updated campaign');
+    expect(updateResponse.body.data.campaign.organizationName).toBe(organizationName);
     expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
       {
         _id: campaignId,
@@ -278,6 +329,7 @@ describe('business routes', () => {
       .expect(200);
 
     expect(response.body.data.campaign.inventoryCount).toBe(2);
+    expect(response.body.data.campaign.organizationName).toBe(organizationName);
     expect(Voucher.deleteMany).toHaveBeenCalledWith(
       { campaignId, sourceType: 'campaign' },
       { session },
