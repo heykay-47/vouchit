@@ -37,6 +37,7 @@ export default function RequestSystem() {
   const [requestDescription, setRequestDescription] = useState('');
   const [requestCategory, setRequestCategory] = useState<VoucherCategory>('Food');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canCreateRequest = user?.role !== 'business';
 
   useEffect(() => {
     const fetchRequests = async () => {
@@ -60,6 +61,11 @@ export default function RequestSystem() {
 
     if (!user) {
       toast.error('You must be logged in to make requests');
+      return;
+    }
+
+    if (!canCreateRequest) {
+      toast.error('Business accounts cannot make voucher requests');
       return;
     }
 
@@ -99,7 +105,7 @@ export default function RequestSystem() {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Voucher Requests</h3>
 
-        {user && (
+        {user && canCreateRequest && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="flex items-center gap-2">
@@ -174,6 +180,12 @@ export default function RequestSystem() {
       {!user && (
         <div className="p-4 border rounded-md bg-muted/50 text-center">
           Please log in to make voucher requests
+        </div>
+      )}
+
+      {user?.role === 'business' && (
+        <div className="rounded-md border bg-muted/50 p-4 text-center">
+          Business accounts cannot make voucher requests
         </div>
       )}
 

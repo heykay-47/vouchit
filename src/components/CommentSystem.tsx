@@ -20,6 +20,7 @@ export default function CommentSystem({ voucherId }: CommentSystemProps) {
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const canComment = user?.role !== 'business';
 
   useEffect(() => {
     const fetchComments = async () => {
@@ -43,6 +44,11 @@ export default function CommentSystem({ voucherId }: CommentSystemProps) {
 
     if (!user) {
       toast.error('You must be logged in to comment');
+      return;
+    }
+
+    if (!canComment) {
+      toast.error('Business accounts cannot add comments');
       return;
     }
 
@@ -70,7 +76,7 @@ export default function CommentSystem({ voucherId }: CommentSystemProps) {
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">Comments</h3>
 
-      {user && (
+      {user && canComment && (
         <form onSubmit={handleSubmitComment} className="space-y-4">
           <Textarea
             placeholder="Add a comment..."
@@ -88,6 +94,12 @@ export default function CommentSystem({ voucherId }: CommentSystemProps) {
       {!user && (
         <div className="p-4 border rounded-md bg-muted/50 text-center">
           Please log in to add comments
+        </div>
+      )}
+
+      {user?.role === 'business' && (
+        <div className="rounded-md border bg-muted/50 p-4 text-center">
+          Business accounts cannot add comments
         </div>
       )}
 

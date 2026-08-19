@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Info,
   LayoutDashboard,
@@ -18,25 +18,29 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthDialog } from '@/contexts/AuthDialogContext';
+import type { User as AppUser, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   path: string;
-  authRequired: boolean;
+  audience: 'public' | UserRole;
+  authRequired?: boolean;
 }
 
 const primaryNav: NavItem[] = [
-  { icon: Ticket, label: 'browse', path: '/browse', authRequired: false },
-  { icon: Plus, label: 'donate', path: '/donate', authRequired: false },
+  { icon: Ticket, label: 'browse', path: '/browse', audience: 'public' },
+  { icon: Plus, label: 'donate', path: '/donate', audience: 'customer' },
 ];
 
 const secondaryNav: NavItem[] = [
-  { icon: LayoutDashboard, label: 'dashboard', path: '/dashboard', authRequired: true },
-  { icon: Users, label: 'community', path: '/community', authRequired: false },
-  { icon: Settings, label: 'settings', path: '/settings', authRequired: true },
-  { icon: Info, label: 'about', path: '/about', authRequired: false },
+  { icon: LayoutDashboard, label: 'dashboard', path: '/dashboard', audience: 'customer' },
+  { icon: Ticket, label: 'campaigns', path: '/business/campaigns', audience: 'business' },
+  { icon: Ticket, label: 'invoices', path: '/business/invoices', audience: 'business' },
+  { icon: Users, label: 'community', path: '/community', audience: 'public' },
+  { icon: Settings, label: 'settings', path: '/settings', audience: 'public', authRequired: true },
+  { icon: Info, label: 'about', path: '/about', audience: 'public' },
 ];
 
 const desktopMediaQuery = '(min-width: 1024px)';
@@ -49,6 +53,7 @@ export default function Sidebar() {
   const { openLogin, openSignup } = useAuthDialog();
   const { resolvedTheme, setTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const isDarkTheme = resolvedTheme === 'dark';
 
   useEffect(() => {
@@ -66,8 +71,13 @@ export default function Sidebar() {
     return location.pathname.startsWith(path);
   };
 
+  const navigateToRoleHome = (authenticatedUser: AppUser) => {
+    navigate(authenticatedUser.role === 'business' ? '/business' : '/dashboard');
+  };
+
   const NavLink = ({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) => {
-    if (item.authRequired && !isAuthenticated) return null;
+    const isAudienceVisible = item.audience === 'public' || user?.role === item.audience;
+    if (!isAudienceVisible || (item.authRequired && !isAuthenticated)) return null;
 
     const active = isActive(item.path);
 
@@ -96,7 +106,7 @@ export default function Sidebar() {
         onAuthHandoff('login');
         return;
       }
-      openLogin();
+      openLogin(undefined, navigateToRoleHome);
     };
 
     const handleSignup = () => {
@@ -104,7 +114,7 @@ export default function Sidebar() {
         onAuthHandoff('signup');
         return;
       }
-      openSignup();
+      openSignup(undefined, navigateToRoleHome);
     };
 
     const handleLogout = () => {
@@ -209,8 +219,8 @@ export default function Sidebar() {
               event.preventDefault();
               const mode = pendingAuthMode;
               setPendingAuthMode(null);
-              if (mode === 'login') openLogin(menuButtonRef.current);
-              else openSignup(menuButtonRef.current);
+              if (mode === 'login') openLogin(menuButtonRef.current, navigateToRoleHome);
+              else openSignup(menuButtonRef.current, navigateToRoleHome);
               return;
             }
             event.preventDefault();

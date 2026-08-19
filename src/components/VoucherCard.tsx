@@ -27,9 +27,10 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   const { isAuthenticated, user } = useAuth();
   const { openLogin } = useAuthDialog();
   const { redeemVoucher, reportVoucher, retryVouchers } = useVouchers();
-  
+
   const hasExpired = voucher.expiryDate ? new Date(voucher.expiryDate) < new Date() : false;
-  const isRedeemable = !hasAvailabilityConflict && !voucher.isRedeemed && voucher.isActive && !hasExpired && user?.id !== voucher.donatedBy;
+  const canUseCustomerActions = !user || user.role === 'customer';
+  const isRedeemable = canUseCustomerActions && !hasAvailabilityConflict && !voucher.isRedeemed && voucher.isActive && !hasExpired && user?.id !== voucher.donatedBy;
   const isOwnRedeemedVoucher = user?.id === voucher.redeemedBy;
   
   const getDaysUntilExpiry = () => {
@@ -51,7 +52,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   };
   
   const handleRedeem = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || user?.role === 'business') {
       toast.error('please log in to redeem vouchers');
       return;
     }
@@ -79,7 +80,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   };
   
   const handleReport = async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || user?.role === 'business') {
       toast.error('please log in to report vouchers');
       return;
     }
@@ -303,7 +304,7 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
                 </Button>
               )}
               
-              {isAuthenticated && voucher.isRedeemed && isOwnRedeemedVoucher && (
+              {isAuthenticated && user?.role !== 'business' && voucher.isRedeemed && isOwnRedeemedVoucher && (
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 

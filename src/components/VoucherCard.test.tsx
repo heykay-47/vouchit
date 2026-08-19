@@ -61,6 +61,7 @@ const authenticatedUser = {
   username: 'user',
   createdAt: new Date('2026-01-01T00:00:00Z'),
   redeemedVouchers: [],
+  role: 'customer' as const,
 };
 
 function setupUser() {
@@ -336,5 +337,32 @@ describe('VoucherCard', () => {
 
     await user.click(screen.getByRole('button', { name: /view details$/ }));
     expect(screen.getByText(message)).toBeInTheDocument();
+  });
+
+  it('retains business voucher inspection without customer action controls', async () => {
+    const user = setupUser();
+    const businessUser = { ...authenticatedUser, id: 'business-1', role: 'business' as const };
+    mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: businessUser });
+    render(<VoucherCard voucher={voucher} />);
+
+    await user.click(screen.getByRole('button', { name: /view details$/ }));
+
+    expect(screen.getByText(voucher.code)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'redeem voucher' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'sign in to redeem' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'not working' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'worked' })).not.toBeInTheDocument();
+  });
+
+  it('suppresses business report controls on an owned redeemed voucher', async () => {
+    const user = setupUser();
+    const businessUser = { ...authenticatedUser, id: 'business-1', role: 'business' as const };
+    mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: businessUser });
+    render(<VoucherCard voucher={{ ...voucher, isRedeemed: true, redeemedBy: businessUser.id }} />);
+
+    await user.click(screen.getByRole('button', { name: /view details$/ }));
+
+    expect(screen.queryByRole('button', { name: 'not working' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'worked' })).not.toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ import { VoucherProvider } from "./contexts/VoucherContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { lazy, Suspense, Component, ReactNode } from 'react';
 import LoadingScreen from "./components/LoadingScreen";
+import RoleRoute from "./components/RoleRoute";
 import Sidebar from "./components/Sidebar";
 import { logger } from '@/utils/logger';
 
@@ -22,6 +23,7 @@ const Donate = lazy(() => import("./pages/Donate"));
 const Settings = lazy(() => import("./pages/Settings"));
 const About = lazy(() => import("./pages/About"));
 const Community = lazy(() => import("./pages/Community"));
+const BusinessDashboard = lazy(() => import("./pages/business/BusinessDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Error Boundary Component
@@ -120,20 +122,21 @@ const App = () => (
       <TooltipProvider>
         <ThemeProvider>
           <AuthProvider>
-            <AuthDialogProvider>
-              <VoucherProvider>
-                <Toaster />
-                <Sonner />
-                <Analytics />
-                <SpeedInsights />
-                <BrowserRouter basename={basename}>
+            <BrowserRouter basename={basename}>
+              <AuthDialogProvider>
+                <VoucherProvider>
+                  <Toaster />
+                  <Sonner />
+                  <Analytics />
+                  <SpeedInsights />
                   <Suspense fallback={<LoadingScreen />}>
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route element={<OperatingLayout />}>
                         <Route path="/browse" element={<Browse />} />
-                        <Route path="/donate" element={<ProtectedRoute><Donate /></ProtectedRoute>} />
-                        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                        <Route path="/donate" element={<RoleRoute role="customer"><Donate /></RoleRoute>} />
+                        <Route path="/dashboard" element={<RoleRoute role="customer"><Dashboard /></RoleRoute>} />
+                        <Route path="/business" element={<RoleRoute role="business"><BusinessDashboard /></RoleRoute>} />
                         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                         <Route path="/about" element={<About />} />
                         <Route path="/community" element={<Community />} />
@@ -141,9 +144,9 @@ const App = () => (
                       </Route>
                     </Routes>
                   </Suspense>
-                </BrowserRouter>
-              </VoucherProvider>
-            </AuthDialogProvider>
+                </VoucherProvider>
+              </AuthDialogProvider>
+            </BrowserRouter>
           </AuthProvider>
         </ThemeProvider>
       </TooltipProvider>

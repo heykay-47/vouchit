@@ -2,6 +2,7 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '@/test/render';
+import type { UserRole } from '@/lib/types';
 import Sidebar from './Sidebar';
 
 const openLogin = vi.fn();
@@ -13,6 +14,7 @@ const desktopListeners = new Set<(event: MediaQueryListEvent) => void>();
 let isDesktop = false;
 let isAuthenticated = false;
 let resolvedTheme = 'dark';
+let userRole: UserRole = 'customer';
 
 function enterDesktop() {
   isDesktop = true;
@@ -23,7 +25,7 @@ function enterDesktop() {
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     isAuthenticated,
-    user: isAuthenticated ? { id: 'user-1', username: 'user' } : null,
+    user: isAuthenticated ? { id: 'user-1', username: 'user', role: userRole } : null,
     logout,
   }),
 }));
@@ -41,6 +43,7 @@ describe('Sidebar', () => {
     vi.clearAllMocks();
     isDesktop = false;
     isAuthenticated = false;
+    userRole = 'customer';
     resolvedTheme = 'dark';
     desktopListeners.clear();
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -104,7 +107,7 @@ describe('Sidebar', () => {
     const drawer = within(screen.getByRole('dialog', { name: 'vouchit navigation' }));
 
     expect(drawer.getByRole('link', { name: /VouchIt/i })).toHaveClass('min-h-11');
-    for (const name of ['browse', 'donate', 'community', 'about']) {
+    for (const name of ['browse', 'community', 'about']) {
       expect(drawer.getByRole('link', { name })).toHaveClass('min-h-11');
     }
     expect(drawer.getByRole('button', { name: 'log in' })).toHaveClass('h-11');
@@ -182,5 +185,44 @@ describe('Sidebar', () => {
     act(() => enterDesktop());
 
     expect(screen.queryByRole('dialog', { name: 'vouchit navigation' })).not.toBeInTheDocument();
+  });
+
+  it('shows customer operating links without business mutations', () => {
+    isAuthenticated = true;
+    userRole = 'customer';
+    renderWithRouter(<Sidebar />, '/dashboard');
+
+    expect(screen.getByRole('link', { name: 'donate' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'campaigns' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'invoices' })).not.toBeInTheDocument();
+  });
+
+  it('shows only business operating links to a business', () => {
+    isAuthenticated = true;
+    userRole = 'business';
+    renderWithRouter(<Sidebar />, '/business');
+
+    expect(screen.getByRole('link', { name: 'campaigns' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'invoices' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'donate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'dashboard' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['customer', 'dashboard'],
+    ['business', 'business'],
+  ] as const)('navigates a returned %s user to their role home', async (role, destination) => {
+    const user = userEvent.setup();
+    userRole = role;
+    renderWithRouter(<Sidebar />, '/browse');
+
+    await user.click(screen.getByRole('button', { name: 'log in' }));
+    const continuation = openLogin.mock.calls[0]?.[1] as ((user: { role: UserRole }) => void) | undefined;
+    expect(continuation).toEqual(expect.any(Function));
+
+    act(() => continuation?.({ role }));
+
+    expect(window.location.pathname).toBe(`/${destination}`);
   });
 });
