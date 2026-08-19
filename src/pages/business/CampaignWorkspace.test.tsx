@@ -189,4 +189,31 @@ describe('CampaignWorkspace', () => {
     expect(screen.getByText(/11:59 pm/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'record external payment' })).not.toBeInTheDocument();
   });
+
+  it('shows observed campaign outcomes only when analytics is available', () => {
+    queryState.data = {
+      ...workspace,
+      analytics: {
+        totalInventory: 2,
+        views: 8,
+        claimedBeforeExpiry: 1,
+        remaining: 1,
+        expired: 0,
+        deactivated: 0,
+        claimRate: 0.5,
+        feePerClaimPaise: null,
+      },
+    };
+
+    renderWorkspace('/business/campaigns/campaign-1');
+
+    expect(screen.getByRole('heading', { name: 'campaign outcomes' })).toBeInTheDocument();
+    expect(screen.getByText('not available')).toBeInTheDocument();
+  });
+
+  it('does not render outcomes for a campaign without analytics', () => {
+    renderWorkspace('/business/campaigns/campaign-1');
+
+    expect(screen.queryByRole('heading', { name: 'campaign outcomes' })).not.toBeInTheDocument();
+  });
 });

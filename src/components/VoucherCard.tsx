@@ -9,6 +9,7 @@ import { Check, X, AlertTriangle, Copy, ImageOff } from 'lucide-react';
 import { toast } from '@/utils/toast';
 import { logger } from '@/utils/logger';
 import { ApiClientError } from '@/services/api-client';
+import { voucherService } from '@/services/voucher.service';
 
 interface VoucherCardProps {
   voucher: Voucher;
@@ -126,10 +127,19 @@ const VoucherCard = memo(function VoucherCard({ voucher, onRedeemSuccess }: Vouc
   };
 
   const handleOpenChange = (open: boolean) => {
+    const wasClosed = !isDetailsOpen;
     setIsDetailsOpen(open);
-    if (open) {
+    if (open && wasClosed) {
       setIsImageLoaded(false);
       setHasImageError(false);
+      if (voucher.sourceType === 'campaign') {
+        void voucherService.recordView(voucher.id).catch((error: unknown) => {
+          logger.error('Error recording voucher view', error, {
+            component: 'VoucherCard',
+            voucherId: voucher.id,
+          });
+        });
+      }
     } else if (hasAvailabilityConflict) {
       void retryVouchers();
     }

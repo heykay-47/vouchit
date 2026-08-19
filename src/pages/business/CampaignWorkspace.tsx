@@ -6,6 +6,7 @@ import CampaignInventoryImport from '@/components/business/CampaignInventoryImpo
 import CampaignInvoice from '@/components/business/CampaignInvoice';
 import CampaignStages, { type CampaignStage } from '@/components/business/CampaignStages';
 import SettlementForm from '@/components/business/SettlementForm';
+import CampaignOutcomes from '@/components/business/CampaignOutcomes';
 import {
   useBusinessCampaignQuery,
   useCreateCampaignMutation,
@@ -74,6 +75,12 @@ export default function CampaignWorkspace() {
       </header>
 
       <CampaignStages stage={stage} />
+
+      {query.data?.analytics ? (
+        <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
+          <CampaignOutcomes analytics={query.data.analytics} />
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-border bg-card p-5 sm:p-6">
         <h2 className="mb-4 text-lg font-medium lowercase">campaign details</h2>

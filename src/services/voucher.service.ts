@@ -15,6 +15,12 @@ export const voucherService = {
     }));
   },
 
+  async recordView(voucherId: string): Promise<void> {
+    await apiRequest<{ recorded: boolean }>(`/api/vouchers/${voucherId}/view`, {
+      method: 'POST',
+    });
+  },
+
   async donate(voucher: Omit<Voucher, 'id' | 'donatedAt' | 'reportCount' | 'isActive'>) {
     return apiRequest<{ voucher: Voucher }>('/api/vouchers', {
       method: 'POST',
