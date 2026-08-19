@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
-import { getOptionalUserId, optionalAuth, requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { getOptionalUserId, optionalAuth, requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
 import { Comment } from '../models/Comment.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
@@ -78,7 +78,7 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   ok(res, { vouchers: vouchers.map((voucher) => toVoucherResponse(voucher, viewerId)) });
 }));
 
-router.post('/', requireAuth, asyncRoute(async (req, res) => {
+router.post('/', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const input = voucherSchema.parse(req.body);
   const userId = (req as AuthedRequest).userId;
@@ -103,7 +103,7 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
   ok(res, { voucher: toVoucherResponse(voucher, userId) }, 201);
 }));
 
-router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
+router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const userId = (req as AuthedRequest).userId;
   const voucherId = req.params.id;
@@ -126,7 +126,7 @@ router.post('/:id/redeem', requireAuth, asyncRoute(async (req, res) => {
   ok(res, { voucher: toVoucherResponse(voucher, userId), message: 'Voucher redeemed successfully' });
 }));
 
-router.post('/:id/report', requireAuth, asyncRoute(async (req, res) => {
+router.post('/:id/report', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const userId = (req as AuthedRequest).userId;
   const voucherId = req.params.id;
@@ -176,7 +176,7 @@ router.get('/:id/comments', asyncRoute(async (req, res) => {
   });
 }));
 
-router.post('/:id/comments', requireAuth, asyncRoute(async (req, res) => {
+router.post('/:id/comments', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const voucherId = req.params.id;
   if (!mongoose.isValidObjectId(voucherId)) {

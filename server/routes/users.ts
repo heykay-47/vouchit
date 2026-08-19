@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
-import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { toUserResponse } from '../lib/serializers.js';
 import { Favorite } from '../models/Favorite.js';
 import { User } from '../models/User.js';
@@ -53,7 +53,7 @@ router.patch('/me/preferences', asyncRoute(async (req, res) => {
   ok(res, { notificationPreferences: user.notificationPreferences });
 }));
 
-router.post('/me/favorites/:voucherId', asyncRoute(async (req, res) => {
+router.post('/me/favorites/:voucherId', requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const voucherId = req.params.voucherId;
   if (!mongoose.isValidObjectId(voucherId)) {
@@ -74,7 +74,7 @@ router.post('/me/favorites/:voucherId', asyncRoute(async (req, res) => {
   ok(res, { voucherId });
 }));
 
-router.delete('/me/favorites/:voucherId', asyncRoute(async (req, res) => {
+router.delete('/me/favorites/:voucherId', requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const voucherId = req.params.voucherId;
   if (!mongoose.isValidObjectId(voucherId)) {

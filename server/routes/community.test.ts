@@ -31,7 +31,14 @@ vi.mock('../models/VoucherRequest', () => {
     },
   };
 });
-vi.mock('../models/User', () => ({ User: { find: vi.fn(async () => []) } }));
+vi.mock('../models/User', () => ({
+  User: {
+    find: vi.fn(async () => []),
+    findById: vi.fn(async (id: string) => ({
+      role: id === '507f1f77bcf86cd799439099' ? 'business' : 'customer',
+    })),
+  },
+}));
 vi.mock('../models/Notification', () => {
   const notifications: any[] = [];
   const chain = {
@@ -75,6 +82,17 @@ describe('community routes', () => {
     activities.length = 0;
     vi.mocked(User.find).mockReset();
     vi.mocked(User.find).mockResolvedValue([] as any);
+  });
+
+  it.each([
+    ['post', '/api/requests'],
+  ])('rejects business mutation %s %s', async (method, path) => {
+    const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
+
+    await (request(createApp()) as any)[method](path)
+      .set('Cookie', [`auth_token=${businessToken}`])
+      .send({ title: 'Need food voucher', description: 'Any grocery coupon', category: 'Food' })
+      .expect(403);
   });
 
   it('lists voucher requests', async () => {

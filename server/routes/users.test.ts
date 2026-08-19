@@ -9,6 +9,9 @@ const users = new Map<string, any>();
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
 vi.mock('../models/User', () => ({
   User: {
+    findById: vi.fn(async (id: string) => ({
+      role: id === '507f1f77bcf86cd799439099' ? 'business' : 'customer',
+    })),
     findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
       const user = users.get(id) ?? {
         _id: { toString: () => id },
@@ -59,6 +62,18 @@ describe('user routes', () => {
     process.env.JWT_SECRET = 'test-secret';
     favorites.clear();
     users.clear();
+  });
+
+  it.each([
+    ['post', '/api/users/me/favorites/507f1f77bcf86cd799439012'],
+    ['delete', '/api/users/me/favorites/507f1f77bcf86cd799439012'],
+  ])('rejects business mutation %s %s', async (method, path) => {
+    const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
+
+    await (request(createApp()) as any)[method](path)
+      .set('Cookie', [`auth_token=${businessToken}`])
+      .send({})
+      .expect(403);
   });
 
   it('PATCH /me does not leak passwordHash', async () => {

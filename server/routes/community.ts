@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
-import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
 import { Notification } from '../models/Notification.js';
 import { User } from '../models/User.js';
@@ -69,7 +69,7 @@ router.get('/requests', asyncRoute(async (req, res) => {
   });
 }));
 
-router.post('/requests', requireAuth, asyncRoute(async (req, res) => {
+router.post('/requests', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const input = z.object({
     title: z.string().min(1).max(120),

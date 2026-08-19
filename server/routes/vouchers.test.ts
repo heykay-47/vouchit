@@ -74,11 +74,30 @@ vi.mock('../models/Comment', () => {
 vi.mock('../models/User', () => ({
   User: {
     find: vi.fn(async () => []),
-    findById: vi.fn(async () => ({ username: 'student' })),
+    findById: vi.fn(async (id: string) => ({
+      username: 'student',
+      role: id === '507f1f77bcf86cd799439099' ? 'business' : 'customer',
+    })),
   },
 }));
 vi.mock('../models/RedeemedVoucher', () => ({ RedeemedVoucher: { create: vi.fn(async () => ({})) } }));
 vi.mock('../models/ReportedVoucher', () => ({ ReportedVoucher: { create: vi.fn(async () => ({})) } }));
+
+const validBodyFor = (path: string) => {
+  if (path === '/api/vouchers') {
+    return {
+      platform: 'Google Pay',
+      title: 'Save 10',
+      description: 'Ten off',
+      code: 'SAVE10',
+      imageUrl: 'data:image/png;base64,abc',
+      category: 'Shopping',
+    };
+  }
+
+  if (path.endsWith('/comments')) return { text: 'Is this still valid?' };
+  return {};
+};
 
 describe('voucher routes', () => {
   beforeEach(() => {
@@ -86,6 +105,20 @@ describe('voucher routes', () => {
     vouchers.length = 0;
     comments.length = 0;
     vi.clearAllMocks();
+  });
+
+  it.each([
+    ['post', '/api/vouchers'],
+    ['post', '/api/vouchers/507f1f77bcf86cd799439012/redeem'],
+    ['post', '/api/vouchers/507f1f77bcf86cd799439012/report'],
+    ['post', '/api/vouchers/507f1f77bcf86cd799439012/comments'],
+  ])('rejects business mutation %s %s', async (method, path) => {
+    const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
+
+    await (request(createApp()) as any)[method](path)
+      .set('Cookie', [`auth_token=${businessToken}`])
+      .send(validBodyFor(path))
+      .expect(403);
   });
 
   it('creates a voucher for an authenticated user', async () => {
