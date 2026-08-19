@@ -1,6 +1,6 @@
 # VouchIt
 
-A voucher swapping platform where users can donate and redeem digital vouchers from Google Pay, PayTM, PhonePe, and other online platforms.
+A voucher sharing platform where customers can donate and claim digital vouchers, and businesses can publish campaign inventory for customers to use before expiry.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ cp .env.example .env
 npm run dev
 ```
 
-The API runs as Vercel serverless functions — in local dev it only works when deployed or tested via `npx tsx server/app.ts`. Frontend starts at `http://localhost:5173`.
+The frontend starts at `http://localhost:5173`. Vercel runs the API as serverless functions; for local API work, use `npx tsx server/app.ts` alongside the frontend.
 
 ### Environment Variables
 
@@ -37,14 +37,24 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 - **Backend**: Vercel Serverless Functions with Express 4, Mongoose 8, Zod
 - **Database**: MongoDB Atlas
 - **Auth**: Email/password with bcryptjs + JWT httpOnly cookies
+- **Business inventory**: Papa Parse CSV parsing and preview validation in the browser
 - **Testing**: Vitest, Supertest
+
+## Product Model
+
+VouchIt supports both sides of the marketplace without claiming that a payment processor or fulfillment network is built in:
+
+- **Customers** browse community and business campaign vouchers, claim vouchers they can use, and can donate, favorite, comment on, report, and request vouchers when signed in as customers.
+- **Businesses** create a campaign draft, validate and confirm CSV inventory, receive a paise-denominated invoice, and record external or offline settlement evidence. Settlement is recorded by VouchIt; it is not processed by VouchIt.
+- **Publishing** is settlement-gated. Paid campaigns expose active inventory, and the business workspace shows observed voucher views and claims when analytics exist.
+- **Pricing** is `₹99 + ₹2 per confirmed campaign voucher`, represented internally as `9900 + 200 * quantity` paise.
 
 ## API Endpoints
 
 ### Auth
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/signup` | No | Create account (email, username, password) |
+| POST | `/api/auth/signup` | No | Create a customer or business account (role plus role-specific profile fields) |
 | POST | `/api/auth/login` | No | Log in |
 | POST | `/api/auth/logout` | No | Clear session cookie |
 | GET | `/api/auth/me` | Yes | Get current user with favorites & redemptions |
@@ -76,6 +86,19 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 | PATCH | `/api/notifications/:id/read` | Yes | Mark notification read |
 | GET | `/api/leaderboard` | No | Top donors |
 | GET | `/api/activities` | No | Recent activity feed |
+
+### Business
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/business/campaigns` | Business | List owned campaigns with inventory, invoice, and eligible analytics |
+| POST | `/api/business/campaigns` | Business | Create a campaign draft |
+| GET | `/api/business/campaigns/:id` | Business | Read one owned campaign workspace |
+| PATCH | `/api/business/campaigns/:id` | Business | Edit an unlocked campaign draft |
+| POST | `/api/business/campaigns/:id/inventory/preview` | Business | Validate CSV-derived inventory rows without writing |
+| PUT | `/api/business/campaigns/:id/inventory` | Business | Replace inventory after preview confirmation |
+| POST | `/api/business/campaigns/:id/invoice` | Business | Issue the immutable campaign invoice and lock the draft |
+| GET | `/api/business/invoices` | Business | List owned invoices |
+| POST | `/api/business/invoices/:id/settlement` | Business | Record matching external/offline settlement evidence and activate the campaign |
 
 ### Health
 | Method | Path | Auth | Description |
@@ -131,6 +154,8 @@ docker run -p 8080:8080 vouchit
 ```
 
 Visit `http://localhost:8080`.
+
+The Docker image serves the static frontend through nginx. It does not serve the Express API; use Vercel for the end-to-end frontend and API deployment.
 
 ## Logging
 
