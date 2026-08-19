@@ -40,4 +40,21 @@ describe('createApp', () => {
 
     expect(res.headers['ratelimit-remaining']).toBeDefined();
   });
+
+  it('mounts business mutations behind the write limiter', async () => {
+    const res = await request(createApp()).post('/api/business/campaigns').send({});
+
+    expect(res.status).toBe(401);
+    expect(res.headers['ratelimit-remaining']).toBeDefined();
+  });
+
+  it('maps oversized JSON bodies to a safe 413 envelope', async () => {
+    const res = await request(createApp())
+      .post('/api/business/campaigns')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ payload: 'x'.repeat(1024 * 1024) }));
+
+    expect(res.status).toBe(413);
+    expect(res.body).toEqual({ data: null, error: { message: 'Request entity too large' } });
+  });
 });

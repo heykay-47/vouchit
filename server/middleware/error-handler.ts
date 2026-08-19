@@ -4,12 +4,19 @@ import { ApiError, fail } from '../lib/http.js';
 
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof ApiError) {
-    fail(res, error.status, error.message);
+    fail(res, error.status, error.message, error.details);
+    return;
+  }
+
+  if ((error as { type?: string }).type === 'entity.too.large') {
+    fail(res, 413, 'Request entity too large');
     return;
   }
 
   if (error instanceof ZodError) {
-    fail(res, 400, error.issues[0]?.message ?? 'Invalid request');
+    fail(res, 400, error.issues[0]?.message ?? 'Invalid request', {
+      issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })),
+    });
     return;
   }
 
