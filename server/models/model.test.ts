@@ -4,6 +4,7 @@ import { Voucher } from './Voucher.js';
 import { Favorite } from './Favorite.js';
 import { ReportedVoucher } from './ReportedVoucher.js';
 import { BusinessProfile } from './BusinessProfile.js';
+import { Campaign } from './Campaign.js';
 
 describe('mongoose models', () => {
   it('defines core collection names', () => {
@@ -11,6 +12,7 @@ describe('mongoose models', () => {
     expect(Voucher.collection.name).toBe('vouchers');
     expect(Favorite.collection.name).toBe('favorites');
     expect(ReportedVoucher.collection.name).toBe('reportedvouchers');
+    expect(Campaign.collection.name).toBe('campaigns');
   });
 
   it('sets voucher defaults', () => {
@@ -26,6 +28,88 @@ describe('mongoose models', () => {
     expect(voucher.isRedeemed).toBe(false);
     expect(voucher.reportCount).toBe(0);
     expect(voucher.isActive).toBe(true);
+  });
+
+  it('defaults campaigns to draft', () => {
+    const campaign = new Campaign({
+      businessId: '507f1f77bcf86cd799439011',
+      businessProfileId: '507f1f77bcf86cd799439012',
+      title: 'Save on groceries',
+      brandName: 'Fresh Market',
+      description: 'A grocery offer',
+      terms: 'One use per customer',
+      platform: 'Google Pay',
+      category: 'Shopping',
+      imageUrl: 'https://example.com/campaign.png',
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+    });
+
+    expect(campaign.status).toBe('draft');
+    expect(campaign.lockedAt).toBeNull();
+  });
+
+  it('indexes campaigns by owner and status', () => {
+    const indexes = Campaign.schema.indexes();
+
+    expect(indexes).toEqual(expect.arrayContaining([
+      [{ businessId: 1 }, expect.anything()],
+      [{ status: 1 }, expect.anything()],
+    ]));
+  });
+
+  it('creates private campaign voucher defaults', () => {
+    const voucher = new Voucher({
+      sourceType: 'campaign',
+      campaignId: '507f1f77bcf86cd799439012',
+      code: 'SAVE50',
+      value: '50',
+      donatedBy: '507f1f77bcf86cd799439011',
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+    });
+
+    expect(voucher.validateSync()).toBeUndefined();
+    expect(voucher.isActive).toBe(false);
+    expect(voucher.viewCount).toBe(0);
+    expect(voucher.sourceType).toBe('campaign');
+  });
+
+  it('requires campaign references only for campaign vouchers', () => {
+    const voucher = new Voucher({
+      sourceType: 'campaign',
+      code: 'SAVE50',
+      donatedBy: '507f1f77bcf86cd799439011',
+    });
+
+    expect(voucher.validateSync()?.errors.campaignId).toBeDefined();
+  });
+
+  it('keeps presentation fields required for community vouchers', () => {
+    const voucher = new Voucher({
+      sourceType: 'community',
+      code: 'SAVE50',
+      donatedBy: '507f1f77bcf86cd799439011',
+    });
+
+    const error = voucher.validateSync();
+
+    expect(error?.errors.platform).toBeDefined();
+    expect(error?.errors.title).toBeDefined();
+    expect(error?.errors.description).toBeDefined();
+    expect(error?.errors.imageUrl).toBeDefined();
+  });
+
+  it('adds a campaign-only unique code index', () => {
+    const indexes = Voucher.schema.indexes();
+
+    expect(indexes).toEqual(expect.arrayContaining([
+      [
+        { campaignId: 1, code: 1 },
+        expect.objectContaining({
+          unique: true,
+          partialFilterExpression: { sourceType: 'campaign' },
+        }),
+      ],
+    ]));
   });
 
   it('defaults new users to the customer role', () => {
