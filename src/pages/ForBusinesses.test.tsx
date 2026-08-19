@@ -46,6 +46,14 @@ describe('ForBusinesses', () => {
     expect(openSignup).toHaveBeenCalledWith(button, undefined, 'business');
   });
 
+  it('uses a dark foreground on the primary CTA for contrast against the green token', () => {
+    renderPage();
+
+    const button = screen.getByRole('button', { name: 'create business account' });
+    expect(button).toHaveClass('text-black');
+    expect(button).not.toHaveClass('text-primary-foreground');
+  });
+
   it('uses factual prototype language without fabricated social proof or payment claims', () => {
     renderPage();
 

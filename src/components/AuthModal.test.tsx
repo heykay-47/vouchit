@@ -85,6 +85,19 @@ describe('AuthModal', () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
   });
 
+  it('keeps customer signup copy focused on one-way voucher sharing', () => {
+    render(<AuthModal isOpen initialMode="signup" onClose={vi.fn()} />);
+
+    expect(screen.getByText('sign up to start swapping vouchers')).toBeInTheDocument();
+  });
+
+  it('uses campaign and external-settlement copy for business signup', () => {
+    render(<AuthModal isOpen initialMode="signup" initialRole="business" onClose={vi.fn()} />);
+
+    expect(screen.getByText('create campaigns, distribute voucher inventory, and record external settlement before publishing')).toBeInTheDocument();
+    expect(screen.queryByText('sign up to start swapping vouchers')).not.toBeInTheDocument();
+  });
+
   it('preselects business signup and submits its accessible organization fields', async () => {
     const user = userEvent.setup();
     const onAuthenticated = vi.fn();

@@ -80,7 +80,7 @@ export default function ForBusinesses() {
           </div>
           <Button
             type="button"
-            className="w-full lowercase sm:w-auto"
+            className="w-full text-black lowercase sm:w-auto"
             onClick={(event) => openSignup(event.currentTarget, undefined, 'business')}
           >
             create business account

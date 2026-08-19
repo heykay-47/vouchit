@@ -184,7 +184,9 @@ export default function AuthModal({
           <DialogDescription>
             {mode === 'login'
               ? 'enter your credentials to access your account'
-              : 'sign up to start swapping vouchers'}
+              : role === 'business'
+                ? 'create campaigns, distribute voucher inventory, and record external settlement before publishing'
+                : 'sign up to start swapping vouchers'}
           </DialogDescription>
         </DialogHeader>
 
