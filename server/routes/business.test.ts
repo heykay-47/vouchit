@@ -10,6 +10,7 @@ import { Voucher } from '../models/Voucher.js';
 const businessId = '507f1f77bcf86cd799439011';
 const otherBusinessId = '507f1f77bcf86cd799439099';
 const profileId = '507f1f77bcf86cd799439012';
+const mismatchedProfileId = '507f1f77bcf86cd799439098';
 const campaignId = '507f1f77bcf86cd799439013';
 const session = { id: 'transaction-session' };
 const campaigns: Record<string, unknown>[] = [];
@@ -216,6 +217,49 @@ describe('business routes', () => {
     expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
+  it('does not patch an owned campaign when its business profile id is mismatched', async () => {
+    const campaign = seedCampaign();
+    businessProfile = { _id: mismatchedProfileId, userId: businessId, organizationName };
+
+    const response = await request(createApp())
+      .patch(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ ...validCampaign, title: 'Unsafe update' })
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+    expect(campaign.title).toBe(validCampaign.title);
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the owning profile inside the patch transaction before mutation', async () => {
+    seedCampaign();
+    vi.mocked(BusinessProfile.findOne)
+      .mockResolvedValueOnce(businessProfile)
+      .mockResolvedValueOnce({
+        _id: mismatchedProfileId,
+        userId: businessId,
+        organizationName,
+      });
+
+    const response = await request(createApp())
+      .patch(`/api/business/campaigns/${campaignId}`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ ...validCampaign, title: 'Raced update' })
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+    expect(withTransaction).toHaveBeenCalledOnce();
+    expect(BusinessProfile.findOne).toHaveBeenNthCalledWith(
+      2,
+      { userId: businessId, _id: profileId },
+      null,
+      { session },
+    );
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
   it('returns 404 before 403 for missing and non-owned campaigns', async () => {
     await request(createApp())
       .get(`/api/business/campaigns/${campaignId}`)
@@ -253,6 +297,7 @@ describe('business routes', () => {
       {
         _id: campaignId,
         businessId,
+        businessProfileId: profileId,
         status: 'draft',
         lockedAt: null,
       },
@@ -338,6 +383,7 @@ describe('business routes', () => {
       {
         _id: campaignId,
         businessId,
+        businessProfileId: profileId,
         status: 'draft',
         lockedAt: null,
       },
@@ -362,6 +408,56 @@ describe('business routes', () => {
       }),
     ], { session });
     expect(Voucher.create).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ session: expect.not.objectContaining(session) }));
+  });
+
+  it('does not replace inventory when the business profile id is mismatched', async () => {
+    seedCampaign();
+    vouchers.push({ campaignId, code: 'OLD-CODE' });
+    businessProfile = { _id: mismatchedProfileId, userId: businessId, organizationName };
+
+    const response = await request(createApp())
+      .put(`/api/business/campaigns/${campaignId}/inventory`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ rows: [{ sourceRow: 2, code: 'SAVE10' }] })
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+    expect(vouchers).toEqual([{ campaignId, code: 'OLD-CODE' }]);
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(Voucher.deleteMany).not.toHaveBeenCalled();
+    expect(Voucher.create).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the owning profile inside the inventory transaction before mutation', async () => {
+    seedCampaign();
+    vouchers.push({ campaignId, code: 'OLD-CODE' });
+    vi.mocked(BusinessProfile.findOne)
+      .mockResolvedValueOnce(businessProfile)
+      .mockResolvedValueOnce({
+        _id: mismatchedProfileId,
+        userId: businessId,
+        organizationName,
+      });
+
+    const response = await request(createApp())
+      .put(`/api/business/campaigns/${campaignId}/inventory`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ rows: [{ sourceRow: 2, code: 'SAVE10' }] })
+      .expect(404);
+
+    expect(response.body.error).toEqual({ message: 'Business profile not found' });
+    expect(vouchers).toEqual([{ campaignId, code: 'OLD-CODE' }]);
+    expect(withTransaction).toHaveBeenCalledOnce();
+    expect(BusinessProfile.findOne).toHaveBeenNthCalledWith(
+      2,
+      { userId: businessId, _id: profileId },
+      null,
+      { session },
+    );
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(Voucher.deleteMany).not.toHaveBeenCalled();
+    expect(Voucher.create).not.toHaveBeenCalled();
   });
 
   it('rejects a stale inventory replacement before deleting existing rows', async () => {

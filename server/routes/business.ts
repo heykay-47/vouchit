@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
+import mongoose, { type ClientSession } from 'mongoose';
 import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import {
@@ -64,9 +64,22 @@ const userIdFrom = (req: AuthedRequest) => req.userId;
 
 const idFor = (value: unknown) => value?.toString?.() ?? String(value);
 
-const requireBusinessProfile = async (businessId: string) => {
-  const profile = await BusinessProfile.findOne({ userId: businessId });
-  if (!profile) {
+const requireBusinessProfile = async (
+  businessId: string,
+  expectedProfileId?: unknown,
+  session?: ClientSession,
+) => {
+  const query = {
+    userId: businessId,
+    ...(expectedProfileId === undefined ? {} : { _id: expectedProfileId }),
+  };
+  const profile = session
+    ? await BusinessProfile.findOne(query, null, { session })
+    : await BusinessProfile.findOne(query);
+  if (!profile || (
+    expectedProfileId !== undefined
+    && idFor(profile._id) !== idFor(expectedProfileId)
+  )) {
     throw new ApiError(404, 'Business profile not found');
   }
   return profile;
@@ -118,9 +131,14 @@ const requireDraft = (campaign: CampaignDocument) => {
   }
 };
 
-const draftCampaignFilter = (campaignId: string, businessId: string) => ({
+const draftCampaignFilter = (
+  campaignId: string,
+  businessId: string,
+  businessProfileId: unknown,
+) => ({
   _id: campaignId,
   businessId,
+  businessProfileId,
   status: 'draft',
   lockedAt: null,
 });
@@ -166,11 +184,19 @@ router.patch('/campaigns/:id', asyncRoute(async (req, res) => {
   const authedReq = req as AuthedRequest;
   const campaign = await requireOwnedCampaign(authedReq);
   requireDraft(campaign);
-  const profile = await requireBusinessProfile(authedReq.userId);
+  await requireBusinessProfile(
+    authedReq.userId,
+    campaign.businessProfileId,
+  );
   const input = campaignPatchSchema.parse(req.body);
-  const updated = await withTransaction(async (session) => {
+  const result = await withTransaction(async (session) => {
+    const currentProfile = await requireBusinessProfile(
+      authedReq.userId,
+      campaign.businessProfileId,
+      session,
+    );
     const current = await Campaign.findOneAndUpdate(
-      draftCampaignFilter(req.params.id, authedReq.userId),
+      draftCampaignFilter(req.params.id, authedReq.userId, currentProfile._id),
       { $set: input },
       { new: true, runValidators: true, session },
     );
@@ -179,14 +205,14 @@ router.patch('/campaigns/:id', asyncRoute(async (req, res) => {
       throw new ApiError(409, 'Campaign is locked');
     }
 
-    return current;
+    return { campaign: current, profile: currentProfile };
   });
 
-  if (!updated) {
+  if (!result.campaign) {
     throw new ApiError(404, 'Campaign not found');
   }
 
-  ok(res, { campaign: await campaignWorkspace(updated, profile) });
+  ok(res, { campaign: await campaignWorkspace(result.campaign, result.profile) });
 }));
 
 router.post('/campaigns/:id/inventory/preview', asyncRoute(async (req, res) => {
@@ -205,7 +231,7 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
   const campaign = await requireOwnedCampaign(authedReq);
   requireDraft(campaign);
   const businessId = userIdFrom(authedReq);
-  const profile = await requireBusinessProfile(businessId);
+  await requireBusinessProfile(businessId, campaign.businessProfileId);
   const { rows } = confirmationSchema.parse(req.body) as { rows: CampaignInventoryCandidate[] };
   const preview = previewCampaignInventory({ headers: ['code', 'value'], rows });
 
@@ -218,9 +244,14 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
   }
 
   const campaignId = req.params.id;
-  const current = await withTransaction(async (session) => {
+  const result = await withTransaction(async (session) => {
+    const currentProfile = await requireBusinessProfile(
+      businessId,
+      campaign.businessProfileId,
+      session,
+    );
     const currentCampaign = await Campaign.findOneAndUpdate(
-      draftCampaignFilter(campaignId, businessId),
+      draftCampaignFilter(campaignId, businessId, currentProfile._id),
       { $set: { updatedAt: new Date() } },
       { new: true, session },
     );
@@ -243,10 +274,10 @@ router.put('/campaigns/:id/inventory', asyncRoute(async (req, res) => {
       { session },
     );
 
-    return currentCampaign;
+    return { campaign: currentCampaign, profile: currentProfile };
   });
 
-  ok(res, { campaign: await campaignWorkspace(current, profile) });
+  ok(res, { campaign: await campaignWorkspace(result.campaign, result.profile) });
 }));
 
 export { router as businessRouter };
