@@ -62,6 +62,12 @@ const confirmationSchema = z.object({
   rows: z.array(inventoryCandidateSchema),
 }).strict();
 
+const settlementSchema = z.object({
+  amountPaise: z.number().int().positive(),
+  externalPaymentReference: z.string().trim().min(1).max(120),
+  externalPaymentDate: z.string().datetime(),
+}).strict();
+
 const userIdFrom = (req: AuthedRequest) => req.userId;
 
 const idFor = (value: unknown) => value?.toString?.() ?? String(value);
@@ -166,6 +172,34 @@ const isDuplicateKeyError = (error: unknown) => (
   typeof error === 'object'
   && error !== null
   && (error as { code?: number }).code === 11000
+);
+
+const validateSettlement = (
+  invoice: InvoiceDocument,
+  input: z.infer<typeof settlementSchema>,
+  now: Date,
+) => {
+  if (input.amountPaise !== invoice.totalPaise) {
+    throw new ApiError(409, 'Settlement amount does not match invoice total');
+  }
+
+  const paymentDate = new Date(input.externalPaymentDate);
+  const issuedAt = new Date(invoice.issuedAt);
+  if (paymentDate.getTime() < issuedAt.getTime() || paymentDate.getTime() > now.getTime()) {
+    throw new ApiError(409, 'Payment date must be between invoice issue and now');
+  }
+
+  return paymentDate;
+};
+
+const settlementMatchesPaidInvoice = (
+  invoice: InvoiceDocument,
+  input: z.infer<typeof settlementSchema>,
+) => (
+  input.amountPaise === invoice.totalPaise
+  && invoice.externalPaymentReference === input.externalPaymentReference
+  && invoice.externalPaymentDate instanceof Date
+  && invoice.externalPaymentDate.getTime() === new Date(input.externalPaymentDate).getTime()
 );
 
 router.use(requireAuth, requireRole('business'));
@@ -370,6 +404,103 @@ router.post('/campaigns/:id/invoice', asyncRoute(async (req, res) => {
   }
 
   ok(res, { invoice: toInvoiceResponse(result.invoice) }, result.created ? 201 : 200);
+}));
+
+router.post('/invoices/:id/settlement', asyncRoute(async (req, res) => {
+  const authedReq = req as AuthedRequest;
+  const invoiceId = req.params.id;
+  if (!mongoose.isValidObjectId(invoiceId)) {
+    throw new ApiError(400, 'Invalid invoice id');
+  }
+
+  await connectDb();
+  const invoice = await Invoice.findById(invoiceId);
+  if (!invoice) {
+    throw new ApiError(404, 'Invoice not found');
+  }
+
+  const businessId = userIdFrom(authedReq);
+  if (idFor(invoice.businessId) !== businessId) {
+    throw new ApiError(403, 'Forbidden');
+  }
+
+  const input = settlementSchema.parse(req.body);
+  const now = new Date();
+  validateSettlement(invoice, input, now);
+
+  const result = await withTransaction(async (session) => {
+    const currentInvoice = await Invoice.findOne(
+      { _id: invoiceId, businessId },
+      null,
+      { session },
+    );
+    if (!currentInvoice) {
+      throw new ApiError(404, 'Invoice not found');
+    }
+
+    if (currentInvoice.status === 'paid') {
+      if (!settlementMatchesPaidInvoice(currentInvoice, input)) {
+        throw new ApiError(409, 'Settlement conflicts with existing payment');
+      }
+
+      const campaign = await Campaign.findOne(
+        { _id: currentInvoice.campaignId, businessId },
+        null,
+        { session },
+      );
+      if (!campaign) {
+        throw new ApiError(409, 'Campaign is unavailable');
+      }
+      const profile = await requireBusinessProfile(businessId, campaign.businessProfileId, session);
+      return { invoice: currentInvoice, campaign, profile };
+    }
+
+    if (currentInvoice.status !== 'issued') {
+      throw new ApiError(409, 'Invoice is unavailable for settlement');
+    }
+    const paymentDate = validateSettlement(currentInvoice, input, now);
+    const paidInvoice = await Invoice.findOneAndUpdate(
+      { _id: invoiceId, businessId, status: 'issued' },
+      {
+        $set: {
+          status: 'paid',
+          paidAt: now,
+          externalPaymentReference: input.externalPaymentReference,
+          externalPaymentDate: paymentDate,
+        },
+      },
+      { new: true, session },
+    );
+    if (!paidInvoice) {
+      throw new ApiError(409, 'Invoice is unavailable for settlement');
+    }
+
+    const campaign = await Campaign.findOneAndUpdate(
+      { _id: currentInvoice.campaignId, businessId, status: 'awaiting_payment' },
+      { $set: { status: 'active' } },
+      { new: true, session },
+    );
+    if (!campaign) {
+      throw new ApiError(409, 'Campaign is unavailable');
+    }
+
+    const activation = await Voucher.updateMany(
+      { campaignId: currentInvoice.campaignId, sourceType: 'campaign', isActive: false },
+      { $set: { isActive: true } },
+      { session },
+    );
+    if (activation.matchedCount !== currentInvoice.quantity) {
+      throw new ApiError(409, 'Campaign inventory is incomplete');
+    }
+
+    const profile = await requireBusinessProfile(businessId, campaign.businessProfileId, session);
+    return { invoice: paidInvoice, campaign, profile };
+  });
+
+  ok(res, {
+    invoice: toInvoiceResponse(result.invoice),
+    campaign: toCampaignResponse(result.campaign, result.profile.organizationName),
+  });
 }));
 
 export { router as businessRouter };

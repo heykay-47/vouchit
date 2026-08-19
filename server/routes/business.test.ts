@@ -13,6 +13,7 @@ const otherBusinessId = '507f1f77bcf86cd799439099';
 const profileId = '507f1f77bcf86cd799439012';
 const mismatchedProfileId = '507f1f77bcf86cd799439098';
 const campaignId = '507f1f77bcf86cd799439013';
+const invoiceId = '507f1f77bcf86cd799439030';
 const session = { id: 'transaction-session' };
 const campaigns: Record<string, unknown>[] = [];
 const vouchers: Record<string, unknown>[] = [];
@@ -20,6 +21,7 @@ const invoices: Record<string, unknown>[] = [];
 const organizationName = 'Fresh Market Ltd';
 let businessProfile: Record<string, unknown> | null;
 let duplicateInvoiceOnCreate = false;
+let failVoucherActivation = false;
 
 const chain = (value: unknown) => {
   const query = {
@@ -30,13 +32,25 @@ const chain = (value: unknown) => {
 };
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
+vi.mock('express-rate-limit', () => ({
+  default: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 vi.mock('../lib/transaction', () => ({
   withTransaction: vi.fn(async (work: (currentSession: object) => Promise<unknown>) => {
-    const original = [...vouchers];
+    const snapshots = [campaigns, vouchers, invoices].map((items) => items.map((item) => ({
+      item,
+      values: { ...item },
+    })));
     try {
       return await work(session);
     } catch (error) {
-      vouchers.splice(0, vouchers.length, ...original);
+      [campaigns, vouchers, invoices].forEach((items, index) => {
+        items.length = 0;
+        snapshots[index].forEach(({ item, values }) => {
+          Object.assign(item, values);
+          items.push(item);
+        });
+      });
       throw error;
     }
   }),
@@ -78,6 +92,7 @@ vi.mock('../models/Campaign', () => ({
         && String(item.businessId) === String(query.businessId)
         && item.status === query.status
         && (query.lockedAt === undefined || item.lockedAt === query.lockedAt)
+        && (query.businessProfileId === undefined || String(item.businessProfileId) === String(query.businessProfileId))
       ));
       if (!campaign) return null;
       const changes = update.$set as Record<string, unknown> | undefined;
@@ -103,14 +118,50 @@ vi.mock('../models/Voucher', () => ({
       vouchers.push(...created);
       return created;
     }),
+    updateMany: vi.fn(async (query: Record<string, unknown>, update: Record<string, unknown>) => {
+      if (failVoucherActivation) {
+        throw new Error('activation callback failed');
+      }
+      const matches = vouchers.filter((voucher) => (
+        String(voucher.campaignId) === String(query.campaignId)
+        && voucher.sourceType === query.sourceType
+        && voucher.isActive === query.isActive
+      ));
+      const changes = update.$set as Record<string, unknown> | undefined;
+      matches.forEach((voucher) => Object.assign(voucher, changes ?? update));
+      return { matchedCount: matches.length, modifiedCount: matches.length };
+    }),
   },
 }));
 vi.mock('../models/Invoice', () => ({
   Invoice: {
+    findById: vi.fn(async (id: string) => invoices.find((invoice) => String(invoice._id) === String(id)) ?? null),
     findOne: vi.fn(async (query: Record<string, unknown>) => invoices.find((invoice) => (
-      String(invoice.campaignId) === String(query.campaignId)
-      && String(invoice.businessId) === String(query.businessId)
+      (query._id === undefined || String(invoice._id) === String(query._id))
+      && (query.campaignId === undefined || String(invoice.campaignId) === String(query.campaignId))
+      && (query.businessId === undefined || String(invoice.businessId) === String(query.businessId))
+      && (query.externalPaymentReference === undefined || invoice.externalPaymentReference === query.externalPaymentReference)
     )) ?? null),
+    findOneAndUpdate: vi.fn(async (query: Record<string, unknown>, update: Record<string, unknown>) => {
+      const invoice = invoices.find((item) => (
+        (query._id === undefined || String(item._id) === String(query._id))
+        && (query.businessId === undefined || String(item.businessId) === String(query.businessId))
+        && (query.status === undefined || item.status === query.status)
+      ));
+      if (!invoice) return null;
+      const changes = update.$set as Record<string, unknown> | undefined;
+      const reference = changes?.externalPaymentReference;
+      if (reference !== undefined && invoices.some((item) => (
+        item !== invoice
+        && item.businessId === invoice.businessId
+        && item.externalPaymentReference === reference
+      ))) {
+        const error = Object.assign(new Error('duplicate reference'), { code: 11000 });
+        throw error;
+      }
+      Object.assign(invoice, changes ?? update);
+      return invoice;
+    }),
     create: vi.fn(async (docs: Record<string, unknown>[]) => {
       if (duplicateInvoiceOnCreate) {
         const error = Object.assign(new Error('duplicate invoice'), { code: 11000 });
@@ -159,6 +210,32 @@ const seedCampaign = (overrides: Record<string, unknown> = {}) => {
   return campaign;
 };
 
+const seedIssuedInvoice = (overrides: Record<string, unknown> = {}) => {
+  const campaign = seedCampaign({
+    status: 'awaiting_payment',
+    lockedAt: new Date('2026-08-19T00:01:00.000Z'),
+  });
+  const invoice = {
+    _id: { toString: () => '507f1f77bcf86cd799439030' },
+    campaignId,
+    businessId,
+    priceVersion: 'v1',
+    currency: 'INR',
+    baseFeePaise: 9900,
+    perVoucherFeePaise: 200,
+    quantity: 1,
+    totalPaise: 10100,
+    status: 'issued',
+    issuedAt: new Date('2026-08-19T00:00:00.000Z'),
+    paidAt: null,
+    externalPaymentReference: null,
+    externalPaymentDate: null,
+    ...overrides,
+  };
+  invoices.push(invoice);
+  return { campaign, invoice };
+};
+
 describe('business routes', () => {
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret';
@@ -166,6 +243,7 @@ describe('business routes', () => {
     vouchers.length = 0;
     invoices.length = 0;
     duplicateInvoiceOnCreate = false;
+    failVoucherActivation = false;
     businessProfile = { _id: profileId, userId: businessId, organizationName };
     vi.clearAllMocks();
   });
@@ -659,5 +737,214 @@ describe('business routes', () => {
     expect(response.body.data.invoice.totalPaise).toBe(10100);
     expect(campaigns[0].status).toBe('draft');
     expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('activates the invoice, campaign, and inventory in one transaction', async () => {
+    const { campaign, invoice } = seedIssuedInvoice();
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10', isActive: false });
+
+    const response = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: ' BANK-001 ',
+        externalPaymentDate: invoice.issuedAt.toISOString(),
+      })
+      .expect(200);
+
+    expect(response.body.data.invoice).toMatchObject({
+      id: invoiceId,
+      status: 'paid',
+      externalPaymentReference: 'BANK-001',
+    });
+    expect(response.body.data.campaign.status).toBe('active');
+    expect(invoice.status).toBe('paid');
+    expect(campaign.status).toBe('active');
+    expect(vouchers[0].isActive).toBe(true);
+    expect(Invoice.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: invoiceId, businessId, status: 'issued' },
+      { $set: expect.objectContaining({ status: 'paid', externalPaymentReference: 'BANK-001' }) },
+      { new: true, session },
+    );
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: campaignId, businessId, status: 'awaiting_payment' },
+      { $set: { status: 'active' } },
+      { new: true, session },
+    );
+    expect(Voucher.updateMany).toHaveBeenCalledWith(
+      { campaignId, sourceType: 'campaign', isActive: false },
+      { $set: { isActive: true } },
+      { session },
+    );
+  });
+
+  it('rejects a settlement with an amount mismatch before mutation', async () => {
+    seedIssuedInvoice();
+
+    const response = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10099,
+        externalPaymentReference: 'BANK-001',
+        externalPaymentDate: '2026-08-19T00:00:00.000Z',
+      })
+      .expect(409);
+
+    expect(response.body.error).toEqual({ message: 'Settlement amount does not match invoice total' });
+    expect(withTransaction).not.toHaveBeenCalled();
+    expect(invoices[0].status).toBe('issued');
+  });
+
+  it('requires a trimmed non-empty settlement reference and an in-range payment date', async () => {
+    seedIssuedInvoice();
+
+    await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: '   ',
+        externalPaymentDate: '2026-08-19T00:00:00.000Z',
+      })
+      .expect(400);
+
+    await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: 'BANK-001',
+        externalPaymentDate: '2026-08-18T23:59:59.999Z',
+      })
+      .expect(409);
+
+    await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: 'BANK-001',
+        externalPaymentDate: new Date(Date.now() + 60_000).toISOString(),
+      })
+      .expect(409);
+  });
+
+  it('rejects settlement by a different business', async () => {
+    seedIssuedInvoice({ businessId: otherBusinessId });
+
+    const response = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: 'BANK-001',
+        externalPaymentDate: '2026-08-19T00:00:00.000Z',
+      })
+      .expect(403);
+
+    expect(response.body.error).toEqual({ message: 'Forbidden' });
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  it('maps a duplicate external payment reference to 409', async () => {
+    seedIssuedInvoice();
+    invoices.push({
+      _id: { toString: () => '507f1f77bcf86cd799439031' },
+      campaignId: '507f1f77bcf86cd799439014',
+      businessId,
+      externalPaymentReference: 'BANK-001',
+      status: 'paid',
+    });
+
+    await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({
+        amountPaise: 10100,
+        externalPaymentReference: 'BANK-001',
+        externalPaymentDate: '2026-08-19T00:00:00.000Z',
+      })
+      .expect(409);
+
+    expect(invoices[0].status).toBe('issued');
+  });
+
+  it('returns identical metadata for an already-paid invoice', async () => {
+    const { invoice } = seedIssuedInvoice();
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10', isActive: false });
+    const input = {
+      amountPaise: 10100,
+      externalPaymentReference: 'BANK-001',
+      externalPaymentDate: invoice.issuedAt.toISOString(),
+    };
+
+    const first = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send(input)
+      .expect(200);
+    const second = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send(input)
+      .expect(200);
+
+    expect(second.body.data).toEqual(first.body.data);
+    expect(Invoice.findOneAndUpdate).toHaveBeenCalledOnce();
+    expect(Campaign.findOneAndUpdate).toHaveBeenCalledOnce();
+    expect(Voucher.updateMany).toHaveBeenCalledOnce();
+  });
+
+  it('rejects conflicting metadata for an already-paid invoice', async () => {
+    const { invoice } = seedIssuedInvoice();
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10', isActive: false });
+    const input = {
+      amountPaise: 10100,
+      externalPaymentReference: 'BANK-001',
+      externalPaymentDate: invoice.issuedAt.toISOString(),
+    };
+
+    await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send(input)
+      .expect(200);
+
+    const response = await request(createApp())
+      .post(`/api/business/invoices/${invoiceId}/settlement`)
+      .set('Cookie', [`auth_token=${tokenFor()}`])
+      .send({ ...input, externalPaymentReference: 'BANK-002' })
+      .expect(409);
+
+    expect(response.body.error).toEqual({ message: 'Settlement conflicts with existing payment' });
+    expect(Invoice.findOneAndUpdate).toHaveBeenCalledOnce();
+    expect(vouchers[0].isActive).toBe(true);
+  });
+
+  it('rolls back invoice and campaign activation when voucher activation fails', async () => {
+    const { campaign, invoice } = seedIssuedInvoice();
+    vouchers.push({ campaignId, sourceType: 'campaign', code: 'SAVE10', isActive: false });
+    failVoucherActivation = true;
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    try {
+      await request(createApp())
+        .post(`/api/business/invoices/${invoiceId}/settlement`)
+        .set('Cookie', [`auth_token=${tokenFor()}`])
+        .send({
+          amountPaise: 10100,
+          externalPaymentReference: 'BANK-001',
+          externalPaymentDate: invoice.issuedAt.toISOString(),
+        })
+        .expect(500);
+    } finally {
+      stderrWrite.mockRestore();
+    }
+
+    expect(invoice.status).toBe('issued');
+    expect(campaign.status).toBe('awaiting_payment');
+    expect(vouchers[0].isActive).toBe(false);
   });
 });
