@@ -316,7 +316,7 @@ describe('voucher routes', () => {
       code: 'PRIVATE-CAMPAIGN-CODE',
       isActive: true,
       isRedeemed: false,
-      expiryDate: new Date(Date.now() + 60_000),
+      expiryDate: new Date('2099-12-31T23:59:59.000Z'),
     });
     vouchers.push(campaignVoucher);
 
@@ -327,6 +327,7 @@ describe('voucher routes', () => {
 
     expect(campaignVoucher.isRedeemed).toBe(false);
     expect(RedeemedVoucher.create).not.toHaveBeenCalled();
+    expect(Campaign.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it.each(['community', undefined])('still redeems %s vouchers', async (sourceType) => {
@@ -656,11 +657,10 @@ describe('voucher routes', () => {
     }]);
   });
 
-  it('rejects a stale campaign voucher claim using the atomic expiry predicate', async () => {
+  it('rejects a stale community voucher claim using the atomic expiry predicate', async () => {
     vouchers.push({
       _id: { toString: () => '507f1f77bcf86cd799439012' },
-      sourceType: 'campaign',
-      campaignId: '507f1f77bcf86cd799439013',
+      sourceType: 'community',
       donatedBy: '507f1f77bcf86cd799439011',
       code: 'EXPIRED',
       expiryDate: new Date('2026-08-18T00:00:00.000Z'),
