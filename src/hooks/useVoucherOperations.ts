@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from '@/utils/toast';
 import { Voucher } from '@/lib/types';
@@ -15,6 +16,8 @@ export const useVoucherOperations = (
   viewerKey: string,
 ) => {
   const queryClient = useQueryClient();
+  const activeViewerKey = useRef(viewerKey);
+  activeViewerKey.current = viewerKey;
 
   const donateMutation = useMutation({
     mutationFn: (voucherData: DonatePayload) => voucherService.donate(voucherData),
@@ -32,17 +35,21 @@ export const useVoucherOperations = (
   });
 
   const redeemMutation = useMutation({
-    mutationFn: (voucherId: string) => voucherService.redeem(voucherId),
-    onSuccess: (response) => {
+    mutationFn: ({ voucherId }: { voucherId: string; viewerKey: string }) => (
+      voucherService.redeem(voucherId)
+    ),
+    onSuccess: (response, mutation) => {
       toast.success('Voucher redeemed successfully');
       setMutationError(null);
       const redeemed = response.voucher;
-      queryClient.setQueryData<Voucher[]>(voucherQueryKeys.list(viewerKey), (current) => {
-        if (!current) return current;
-        return current.map((voucher) => (
-          voucher.id === redeemed.id ? { ...voucher, ...redeemed } : voucher
-        ));
-      });
+      if (redeemed.redeemedBy === mutation.viewerKey && activeViewerKey.current === mutation.viewerKey) {
+        const historyQueryKey = voucherQueryKeys.list(mutation.viewerKey);
+        queryClient.setQueryData<Voucher[]>(historyQueryKey, (current) => {
+          if (!current) return current;
+          return [redeemed, ...current.filter((voucher) => voucher.id !== redeemed.id)];
+        });
+        queryClient.invalidateQueries({ queryKey: historyQueryKey });
+      }
       queryClient.invalidateQueries({ queryKey: offersQueryKey });
     },
     onError: (error: Error) => {
@@ -72,7 +79,7 @@ export const useVoucherOperations = (
   };
 
   const redeemVoucher = async (voucherId: string) => {
-    await redeemMutation.mutateAsync(voucherId);
+    await redeemMutation.mutateAsync({ voucherId, viewerKey });
   };
 
   const reportVoucher = async (voucherId: string) => {
