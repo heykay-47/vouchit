@@ -49,6 +49,36 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
   });
 }));
 
+router.post('/campaign/:campaignId/view', asyncRoute(async (req, res) => {
+  await connectDb();
+  const campaignId = req.params.campaignId;
+  if (!mongoose.isValidObjectId(campaignId)) {
+    throw new ApiError(400, 'Invalid campaign id');
+  }
+
+  const now = new Date();
+  const campaign = await Campaign.exists({
+    _id: campaignId,
+    status: 'active',
+    expiryDate: { $gt: now },
+  });
+  if (campaign) {
+    await Voucher.findOneAndUpdate(
+      {
+        campaignId,
+        sourceType: 'campaign',
+        isActive: true,
+        isRedeemed: false,
+        expiryDate: { $gt: now },
+      },
+      { $inc: { viewCount: 1 } },
+      { new: true, sort: { _id: 1 } },
+    );
+  }
+
+  ok(res, { recorded: true });
+}));
+
 router.post('/campaign/:campaignId/claim', requireAuth, requireRole('customer'), asyncRoute(async (req, res) => {
   await connectDb();
   const campaignId = req.params.campaignId;

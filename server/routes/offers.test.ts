@@ -6,6 +6,7 @@ import { signAuthToken } from '../lib/token.js';
 import { Campaign } from '../models/Campaign.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
 import { User } from '../models/User.js';
+import { Voucher } from '../models/Voucher.js';
 
 const customerId = '507f1f77bcf86cd799439022';
 const otherCustomerId = '507f1f77bcf86cd799439023';
@@ -98,6 +99,21 @@ const makeCampaignVoucher = (overrides: Record<string, unknown> = {}) => ({
 const claim = (id: string, token: string) => request(createApp())
   .post(`/api/offers/campaign/${id}/claim`)
   .set('Cookie', [`auth_token=${token}`]);
+const view = (id: string) => request(createApp())
+  .post(`/api/offers/campaign/${id}/view`);
+
+const arrangeViewState = (state: 'missing' | 'completed' | 'expired' | 'sold-out') => {
+  if (state === 'missing') return;
+  claimState.campaigns.push(makeCampaign({
+    status: state === 'completed' ? 'completed' : 'active',
+    expiryDate: state === 'expired'
+      ? new Date(Date.now() - 60_000)
+      : new Date(Date.now() + 60_000),
+  }));
+  if (state !== 'sold-out') {
+    claimState.vouchers.push(makeCampaignVoucher());
+  }
+};
 
 const communityAggregateRow = {
   _id: { toString: () => '507f1f77bcf86cd799439011' },
@@ -163,14 +179,20 @@ vi.mock('../models/Voucher', () => ({
     }),
     findOneAndUpdate: vi.fn(async (
       filter: TestFilter,
-      update: { $set?: Record<string, unknown> },
-      options: { session: TestSession },
+      update: { $inc?: Record<string, number>; $set?: Record<string, unknown> },
+      options: { session?: TestSession },
     ) => {
       const voucher = claimState.vouchers
         .filter((candidate) => claimState.matches(candidate, filter))
         .sort((left, right) => left._id.toString().localeCompare(right._id.toString()))[0];
       if (!voucher) return null;
-      claimState.updateWithUndo(voucher, update.$set ?? update, options.session);
+      if (update.$inc) {
+        Object.entries(update.$inc).forEach(([key, amount]) => {
+          voucher[key] = Number(voucher[key] ?? 0) + amount;
+        });
+      } else if (options.session) {
+        claimState.updateWithUndo(voucher, update.$set ?? update, options.session);
+      }
       return voucher;
     }),
   },
@@ -178,6 +200,9 @@ vi.mock('../models/Voucher', () => ({
 
 vi.mock('../models/Campaign', () => ({
   Campaign: {
+    exists: vi.fn(async (filter: TestFilter) => (
+      claimState.campaigns.some((campaign) => claimState.matches(campaign, filter))
+    )),
     findOne: vi.fn(async (filter: TestFilter) => (
       claimState.campaigns.find((campaign) => claimState.matches(campaign, filter)) ?? null
     )),
@@ -312,6 +337,55 @@ describe('offer routes', () => {
     expect(response.body.error.message).toBe('Invalid offer cursor');
     expect(lastPipeline()).toEqual([]);
   });
+
+  it('records a grouped campaign view on one stable eligible voucher', async () => {
+    claimState.campaigns.push(makeCampaign());
+    claimState.vouchers.push(
+      makeCampaignVoucher({ _id: voucherId2, viewCount: 2 }),
+      makeCampaignVoucher({ _id: voucherId1, viewCount: 4 }),
+    );
+
+    const response = await view(campaignId).expect(200);
+
+    expect(response.body).toEqual({ data: { recorded: true }, error: null });
+    expect(JSON.stringify(response.body)).not.toMatch(/code|voucherId|campaignId/);
+    expect(claimState.vouchers).toMatchObject([
+      { _id: voucherId2, viewCount: 2 },
+      { _id: voucherId1, viewCount: 5 },
+    ]);
+    expect(Voucher.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        campaignId,
+        sourceType: 'campaign',
+        isActive: true,
+        isRedeemed: false,
+        expiryDate: { $gt: expect.any(Date) },
+      }),
+      { $inc: { viewCount: 1 } },
+      { new: true, sort: { _id: 1 } },
+    );
+  });
+
+  it('returns 400 for a malformed campaign view id', async () => {
+    const response = await view('not-an-id').expect(400);
+
+    expect(response.body.error.message).toBe('Invalid campaign id');
+    expect(Campaign.exists).not.toHaveBeenCalled();
+    expect(Voucher.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'completed', 'expired', 'sold-out'] as const)(
+    'treats %s campaign offer views as a private no-op',
+    async (state) => {
+      arrangeViewState(state);
+
+      const response = await view(campaignId).expect(200);
+
+      expect(response.body).toEqual({ data: { recorded: true }, error: null });
+      expect(JSON.stringify(response.body)).not.toMatch(/code|voucherId|campaignId/);
+      expect(claimState.vouchers.every((voucher) => voucher.viewCount === 0)).toBe(true);
+    },
+  );
 
   it.each([
     ['anonymous', undefined, 401],

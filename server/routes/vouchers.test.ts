@@ -466,55 +466,12 @@ describe('voucher routes', () => {
     ]));
   });
 
-  it('records a view only for an active unredeemed unexpired campaign voucher', async () => {
-    const voucher = {
-      _id: { toString: () => '507f1f77bcf86cd799439012' },
-      sourceType: 'campaign',
-      isActive: true,
-      isRedeemed: false,
-      expiryDate: new Date(Date.now() + 60_000),
-      viewCount: 0,
-      code: 'SECRET-CODE',
-    };
-    vouchers.push(voucher);
-
-    const response = await request(createApp())
+  it('does not expose the obsolete inventory voucher view endpoint', async () => {
+    await request(createApp())
       .post('/api/vouchers/507f1f77bcf86cd799439012/view')
-      .expect(200);
+      .expect(404);
 
-    expect(response.body).toEqual({ data: { recorded: true }, error: null });
-    expect(voucher.viewCount).toBe(1);
-    expect(response.body.data.code).toBeUndefined();
-    expect(Voucher.findOneAndUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        _id: '507f1f77bcf86cd799439012',
-        sourceType: 'campaign',
-        isActive: true,
-        isRedeemed: false,
-        expiryDate: { $gt: expect.any(Date) },
-      }),
-      { $inc: { viewCount: 1 } },
-      { new: true },
-    );
-  });
-
-  it.each(['community', 'unpaid', 'expired', 'missing'])('does not increment a %s voucher view', async (kind) => {
-    const voucher = {
-      _id: { toString: () => '507f1f77bcf86cd799439012' },
-      sourceType: kind === 'community' ? 'community' : 'campaign',
-      isActive: kind !== 'unpaid',
-      isRedeemed: false,
-      expiryDate: kind === 'expired' ? new Date(Date.now() - 60_000) : new Date(Date.now() + 60_000),
-      viewCount: 4,
-    };
-    if (kind !== 'missing') vouchers.push(voucher);
-
-    const response = await request(createApp())
-      .post('/api/vouchers/507f1f77bcf86cd799439012/view')
-      .expect(200);
-
-    expect(response.body).toEqual({ data: { recorded: true }, error: null });
-    expect(voucher.viewCount).toBe(4);
+    expect(Voucher.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   it('batch-loads campaign and business profile attribution for campaign cards', async () => {

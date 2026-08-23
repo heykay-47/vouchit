@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   redeemVoucher: vi.fn(),
   reportVoucher: vi.fn(),
   retryVouchers: vi.fn(),
-  recordView: vi.fn(),
   toast: {
     error: vi.fn(),
     success: vi.fn(),
@@ -39,9 +38,6 @@ vi.mock('@/contexts/AuthDialogContext', () => ({
 
 vi.mock('@/utils/toast', () => ({ toast: mocks.toast }));
 vi.mock('@/utils/logger', () => ({ logger: mocks.logger }));
-vi.mock('@/services/voucher.service', () => ({
-  voucherService: { recordView: mocks.recordView },
-}));
 
 const voucher: Voucher = {
   id: 'voucher-1',
@@ -103,7 +99,6 @@ describe('VoucherCard', () => {
     mocks.redeemVoucher.mockResolvedValue(undefined);
     mocks.reportVoucher.mockResolvedValue(undefined);
     mocks.retryVouchers.mockResolvedValue(undefined);
-    mocks.recordView.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -143,42 +138,22 @@ describe('VoucherCard', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Acme Rewards');
   });
 
-  it('records one nonblocking view for each campaign dialog open', async () => {
+  it('opens a claimed campaign history card without making a voucher service request', async () => {
     const user = setupUser();
-    const pending = deferredPromise();
-    mocks.recordView.mockReturnValue(pending.promise);
-    render(<VoucherCard voucher={campaignVoucher} />);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: authenticatedUser });
+    render(<VoucherCard voucher={{
+      ...campaignVoucher,
+      isRedeemed: true,
+      redeemedBy: authenticatedUser.id,
+    }} />);
 
     await user.click(screen.getByRole('button', { name: /Business Weekend Reward.*view details/ }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(mocks.recordView).toHaveBeenCalledWith(campaignVoucher.id);
-    expect(mocks.recordView).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Close' }));
-    await user.click(screen.getByRole('button', { name: /Business Weekend Reward.*view details/ }));
-
-    expect(mocks.recordView).toHaveBeenCalledTimes(2);
-    pending.resolve();
-  });
-
-  it('does not record community views and logs a failed campaign view without a toast', async () => {
-    const user = setupUser();
-    mocks.recordView.mockRejectedValue(new Error('network failure'));
-    render(<><VoucherCard voucher={campaignVoucher} /><VoucherCard voucher={voucher} /></>);
-
-    await user.click(screen.getByRole('button', { name: /Business Weekend Reward.*view details/ }));
-    await waitFor(() => expect(mocks.logger.error).toHaveBeenCalledWith(
-      'Error recording voucher view',
-      expect.any(Error),
-      expect.objectContaining({ voucherId: campaignVoucher.id }),
-    ));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(mocks.toast.error).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: 'Close' }));
-    await user.click(screen.getByRole('button', { name: /50% Off First Order.*view details/ }));
-    expect(mocks.recordView).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: /CAMPAIGN50/ })).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('includes campaign attribution in the card accessible name', () => {
