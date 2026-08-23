@@ -91,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setIsViewerResolved(true);
         clearViewerQueries();
+        if (!authTransitionRef.current) setIsLoading(false);
         toast.error('Your session has expired. Please log in again.');
       }
     };
@@ -110,77 +111,88 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authTransitionRef.current = true;
     invalidateViewerResolution();
     setIsLoading(true);
-    const result = await signInWithEmail(email, password, rememberMe);
-    if (!result.success) {
+    try {
+      const result = await signInWithEmail(email, password, rememberMe);
+      if (!result.success) {
+        toast.error(result.error || 'Login failed');
+        throw new Error(result.error);
+      }
+      if (!result.user) {
+        toast.error('Login failed');
+        throw new Error('Login failed');
+      }
+      clearViewerQueries();
+      userRef.current = result.user;
+      isViewerResolvedRef.current = true;
+      setUser(result.user);
+      setIsViewerResolved(true);
+      toast.success('Welcome back!');
+      return result.user;
+    } finally {
       authTransitionRef.current = false;
-      setIsLoading(false);
-      toast.error(result.error || 'Login failed');
-      throw new Error(result.error);
+      if (mountedRef.current) setIsLoading(false);
     }
-    if (!result.user) {
-      authTransitionRef.current = false;
-      setIsLoading(false);
-      toast.error('Login failed');
-      throw new Error('Login failed');
-    }
-    clearViewerQueries();
-    userRef.current = result.user;
-    isViewerResolvedRef.current = true;
-    setUser(result.user);
-    setIsViewerResolved(true);
-    authTransitionRef.current = false;
-    setIsLoading(false);
-    toast.success('Welcome back!');
-    return result.user;
   }, [clearViewerQueries, invalidateViewerResolution]);
 
   const signup = useCallback(async (input: SignupInput) => {
     authTransitionRef.current = true;
     invalidateViewerResolution();
     setIsLoading(true);
-    const result = await signUpWithEmail(input);
-    if (!result.success) {
+    try {
+      const result = await signUpWithEmail(input);
+      if (!result.success) {
+        toast.error(result.error || 'Signup failed');
+        throw new Error(result.error);
+      }
+      if (!result.user) {
+        toast.error('Signup failed');
+        throw new Error('Signup failed');
+      }
+      clearViewerQueries();
+      userRef.current = result.user;
+      isViewerResolvedRef.current = true;
+      setUser(result.user);
+      setIsViewerResolved(true);
+      toast.success('Account created successfully!');
+      return result.user;
+    } finally {
       authTransitionRef.current = false;
-      setIsLoading(false);
-      toast.error(result.error || 'Signup failed');
-      throw new Error(result.error);
+      if (mountedRef.current) setIsLoading(false);
     }
-    if (!result.user) {
-      authTransitionRef.current = false;
-      setIsLoading(false);
-      toast.error('Signup failed');
-      throw new Error('Signup failed');
-    }
-    clearViewerQueries();
-    userRef.current = result.user;
-    isViewerResolvedRef.current = true;
-    setUser(result.user);
-    setIsViewerResolved(true);
-    authTransitionRef.current = false;
-    setIsLoading(false);
-    toast.success('Account created successfully!');
-    return result.user;
   }, [clearViewerQueries, invalidateViewerResolution]);
 
   const logout = useCallback(async () => {
     authTransitionRef.current = true;
     invalidateViewerResolution();
     setIsLoading(true);
-    const result = await signOut();
-    if (!result.success) {
-      authTransitionRef.current = false;
+    try {
+      const result = await signOut();
+      clearViewerQueries();
+      userRef.current = null;
+      setUser(null);
+
+      if (!result.success) {
+        isViewerResolvedRef.current = false;
+        setIsViewerResolved(false);
+        toast.error('Logout failed');
+        return;
+      }
+
+      isViewerResolvedRef.current = true;
+      setIsViewerResolved(true);
+      toast.success('Logged out successfully');
+    } catch (error) {
+      clearViewerQueries();
+      userRef.current = null;
+      isViewerResolvedRef.current = false;
+      setUser(null);
+      setIsViewerResolved(false);
       toast.error('Logout failed');
-      setIsLoading(false);
-      return;
+      throw error;
+    } finally {
+      authTransitionRef.current = false;
+      if (mountedRef.current) setIsLoading(false);
     }
-    toast.success('Logged out successfully');
-    userRef.current = null;
-    isViewerResolvedRef.current = true;
-    setUser(null);
-    setIsViewerResolved(true);
-    clearViewerQueries();
-    authTransitionRef.current = false;
-    setIsLoading(false);
   }, [clearViewerQueries, invalidateViewerResolution]);
 
   const updateProfile = useCallback(async (updates: Partial<AppUser>) => {

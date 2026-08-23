@@ -1,5 +1,5 @@
 import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthContextType, User } from '@/lib/types';
 import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
@@ -138,6 +138,7 @@ describe('AuthProvider viewer cache safety', () => {
   });
 
   afterEach(() => {
+    cleanup();
     queryClient.clear();
   });
 
@@ -180,7 +181,7 @@ describe('AuthProvider viewer cache safety', () => {
     expectViewerQueriesCleared();
   });
 
-  it('retains the authenticated viewer and caches when remote logout fails', async () => {
+  it('clears viewer caches and leaves identity unresolved when remote logout fails', async () => {
     authServiceMocks.getCurrentUser.mockResolvedValueOnce({ user: authenticatedUser });
     authServiceMocks.signOut.mockResolvedValueOnce({ success: false, error: 'Network unavailable' });
     renderAuth();
@@ -189,9 +190,41 @@ describe('AuthProvider viewer cache safety', () => {
 
     await act(async () => auth.logout());
 
-    expect(auth.user).toEqual(authenticatedUser);
-    expect(queryClient.getQueriesData({ queryKey: offersQueryKey })).toHaveLength(1);
-    expect(queryClient.getQueriesData({ queryKey: vouchersQueryKey })).toHaveLength(1);
+    expect(auth.user).toBeNull();
+    expect(auth.viewerKey).toBeNull();
+    expect(auth.isLoading).toBe(false);
+    expectViewerQueriesCleared();
+  });
+
+  it('finishes loading and runs anonymous queries when auth:401 invalidates startup resolution', async () => {
+    const startup = deferred<{ user: User }>();
+    authServiceMocks.getCurrentUser.mockReturnValueOnce(startup.promise);
+    offerServiceMocks.list.mockResolvedValueOnce({ ...privateOfferPage, total: 1 });
+
+    renderAuthWithViewerQueries();
+
+    expect(auth.isLoading).toBe(true);
+    expect(voucherServiceMocks.list).not.toHaveBeenCalled();
+    expect(offerServiceMocks.list).not.toHaveBeenCalled();
+
+    act(() => window.dispatchEvent(new CustomEvent('auth:401')));
+
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+    await expectActiveVouchers('PUBLIC:public');
+    await waitFor(() => expect(screen.getByTestId('active-offers')).toHaveTextContent('1'));
+    expect(auth.user).toBeNull();
+    expect(auth.viewerKey).toBe('anonymous');
+
+    await act(async () => {
+      startup.resolve({ user: authenticatedUser });
+      await startup.promise;
+    });
+
+    expect(auth.user).toBeNull();
+    expect(auth.viewerKey).toBe('anonymous');
+    expect(auth.isLoading).toBe(false);
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(1);
+    expect(offerServiceMocks.list).toHaveBeenCalledTimes(1);
   });
 
   it('waits for startup auth resolution before loading the active viewer vouchers', async () => {
@@ -461,18 +494,43 @@ describe('AuthProvider viewer cache safety', () => {
     ]);
   });
 
-  it('keeps the authenticated viewer when remote logout fails', async () => {
-    authServiceMocks.getCurrentUser.mockResolvedValueOnce({ user: authenticatedUser });
+  it('clears mounted private results without starting anonymous queries when remote logout fails', async () => {
+    authServiceMocks.getCurrentUser
+      .mockResolvedValueOnce({ user: authenticatedUser })
+      .mockResolvedValueOnce({ user: authenticatedUser });
     authServiceMocks.signOut.mockResolvedValueOnce({ success: false, error: 'Network unavailable' });
-    voucherServiceMocks.list.mockResolvedValueOnce([firstPrivateVoucher]);
-    renderAuthWithVouchers();
+    voucherServiceMocks.list
+      .mockResolvedValueOnce([firstPrivateVoucher])
+      .mockResolvedValueOnce([secondPrivateVoucher]);
+    offerServiceMocks.list
+      .mockResolvedValueOnce({ ...privateOfferPage, total: 1 })
+      .mockResolvedValueOnce({ ...privateOfferPage, total: 2 });
+    renderAuthWithViewerQueries();
     await expectActiveVouchers('PRIVATE-ONE:CODE-ONE');
+    await waitFor(() => expect(screen.getByTestId('active-offers')).toHaveTextContent('1'));
 
     await act(async () => auth.logout());
 
-    expect(auth.user).toEqual(authenticatedUser);
-    expect(screen.getByTestId('active-vouchers')).toHaveTextContent('PRIVATE-ONE:CODE-ONE');
+    expect(auth.user).toBeNull();
+    expect(auth.viewerKey).toBeNull();
+    expect(auth.isLoading).toBe(false);
+    expect(screen.getByTestId('active-vouchers')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('active-offers')).toBeEmptyDOMElement();
+    expect(queryClient.getQueriesData({ queryKey: offersQueryKey })
+      .filter(([, data]) => data !== undefined)).toEqual([]);
+    expect(queryClient.getQueriesData({ queryKey: vouchersQueryKey })
+      .filter(([, data]) => data !== undefined)).toEqual([]);
     expect(voucherServiceMocks.list).toHaveBeenCalledTimes(1);
+    expect(offerServiceMocks.list).toHaveBeenCalledTimes(1);
+
+    await act(async () => auth.refreshUser());
+
+    await expectActiveVouchers('PRIVATE-TWO:CODE-TWO');
+    await waitFor(() => expect(screen.getByTestId('active-offers')).toHaveTextContent('2'));
+    expect(auth.user).toEqual(authenticatedUser);
+    expect(auth.viewerKey).toBe(authenticatedUser.id);
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(2);
+    expect(offerServiceMocks.list).toHaveBeenCalledTimes(2);
   });
 
   it('preserves business, invoice, and unrelated caches across a viewer change', async () => {
