@@ -148,8 +148,22 @@ router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(asyn
     throw new ApiError(400, 'Invalid voucher id');
   }
 
+  const communitySourceFilter = {
+    $or: [
+      { sourceType: 'community' },
+      { sourceType: { $exists: false } },
+    ],
+  };
+
   const voucher = await Voucher.findOneAndUpdate(
-    { _id: voucherId, ...voucherAvailabilityFilter(), donatedBy: { $ne: userId } },
+    {
+      $and: [
+        { _id: voucherId },
+        voucherAvailabilityFilter(),
+        communitySourceFilter,
+        { donatedBy: { $ne: userId } },
+      ],
+    },
     { isRedeemed: true, redeemedBy: userId, redeemedAt: new Date() },
     { new: true }
   );
@@ -159,19 +173,6 @@ router.post('/:id/redeem', requireAuth, requireRole('customer'), asyncRoute(asyn
   }
 
   await RedeemedVoucher.create({ userId, voucherId }).catch(() => undefined);
-  if (voucher.sourceType === 'campaign' && voucher.campaignId) {
-    const remaining = await Voucher.exists({
-      campaignId: voucher.campaignId,
-      sourceType: 'campaign',
-      isRedeemed: false,
-    });
-    if (!remaining) {
-      await Campaign.findOneAndUpdate(
-        { _id: voucher.campaignId, status: 'active' },
-        { $set: { status: 'completed' } },
-      );
-    }
-  }
   ok(res, { voucher: toVoucherResponse(voucher, userId), message: 'Voucher redeemed successfully' });
 }));
 

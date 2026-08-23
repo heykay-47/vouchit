@@ -4,12 +4,30 @@ import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 import { BusinessProfile } from '../models/BusinessProfile.js';
 import { Campaign } from '../models/Campaign.js';
+import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
 import { Voucher } from '../models/Voucher.js';
 
 const vouchers: any[] = [];
 const comments: any[] = [];
 const campaigns: any[] = [];
 const profiles: any[] = [];
+process.env.JWT_SECRET = 'test-secret';
+const customerId = '507f1f77bcf86cd799439022';
+const customerToken = signAuthToken({ userId: customerId }, '1h');
+let voucherSequence = 40;
+const makeVoucher = (overrides: Record<string, unknown> = {}) => {
+  const id = `507f1f77bcf86cd7994390${voucherSequence++}`;
+  return {
+    _id: { toString: () => id },
+    code: 'COMMUNITY-CODE',
+    donatedBy: '507f1f77bcf86cd799439011',
+    donatedAt: new Date('2026-08-23T00:00:00.000Z'),
+    isActive: true,
+    isRedeemed: false,
+    reportCount: 0,
+    ...overrides,
+  };
+};
 
 const sameId = (left: any, right: any) => left?.toString?.() === right?.toString?.();
 const matchesFilter = (document: any, filter: any): boolean => Object.entries(filter).every(([key, value]) => {
@@ -65,20 +83,8 @@ vi.mock('../models/Voucher', () => {
       }),
       findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
       findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
-        const voucher = vouchers.find((item) => item._id.toString() === filter._id.toString());
+        const voucher = vouchers.find((item) => matchesFilter(item, filter));
         if (!voucher) return null;
-        if (filter.sourceType !== undefined && filter.sourceType !== voucher.sourceType) return null;
-        if (filter.isActive !== undefined && filter.isActive !== voucher.isActive) return null;
-        if (filter.isRedeemed !== undefined && filter.isRedeemed !== voucher.isRedeemed) return null;
-        if (filter.expiryDate?.$gt && (!voucher.expiryDate || voucher.expiryDate <= filter.expiryDate.$gt)) return null;
-        if (filter.donatedBy && typeof filter.donatedBy === 'object' && filter.donatedBy.$ne !== undefined) {
-          if (voucher.donatedBy && voucher.donatedBy.toString() === filter.donatedBy.$ne.toString()) return null;
-        }
-        if (filter.$or?.length && !filter.$or.some((condition: any) => (
-          (condition.expiryDate === null && (voucher.expiryDate == null))
-          || (condition.expiryDate?.$exists === false && voucher.expiryDate === undefined)
-          || (condition.expiryDate?.$gt && (!voucher.expiryDate || voucher.expiryDate > condition.expiryDate.$gt))
-        ))) return null;
         Object.assign(voucher, update);
         if (update.$inc) {
           Object.entries(update.$inc).forEach(([key, value]) => {
@@ -301,6 +307,38 @@ describe('voucher routes', () => {
 
     expect(res.body.data.vouchers).toHaveLength(1);
     expect(res.body.data.vouchers[0].code).toBeUndefined();
+  });
+
+  it('rejects direct redemption of campaign inventory', async () => {
+    const campaignVoucher = makeVoucher({
+      sourceType: 'campaign',
+      campaignId: '507f1f77bcf86cd799439013',
+      code: 'PRIVATE-CAMPAIGN-CODE',
+      isActive: true,
+      isRedeemed: false,
+      expiryDate: new Date(Date.now() + 60_000),
+    });
+    vouchers.push(campaignVoucher);
+
+    await request(createApp())
+      .post(`/api/vouchers/${campaignVoucher._id}/redeem`)
+      .set('Cookie', [`auth_token=${customerToken}`])
+      .expect(409);
+
+    expect(campaignVoucher.isRedeemed).toBe(false);
+    expect(RedeemedVoucher.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['community', undefined])('still redeems %s vouchers', async (sourceType) => {
+    const voucher = makeVoucher({ sourceType, isActive: true, isRedeemed: false, expiryDate: null });
+    vouchers.push(voucher);
+
+    await request(createApp())
+      .post(`/api/vouchers/${voucher._id}/redeem`)
+      .set('Cookie', [`auth_token=${customerToken}`])
+      .expect(200);
+
+    expect(voucher.isRedeemed).toBe(true);
   });
 
   it('rejects a donor from redeeming their own voucher', async () => {
@@ -638,11 +676,22 @@ describe('voucher routes', () => {
 
     expect(vouchers[0].isRedeemed).toBe(false);
     const filter = vi.mocked(Voucher.findOneAndUpdate).mock.calls[0][0] as any;
-    expect(filter).toMatchObject({
-      isActive: true,
-      isRedeemed: false,
-      donatedBy: { $ne: '507f1f77bcf86cd799439022' },
-      $or: expect.any(Array),
+    expect(filter).toEqual({
+      $and: [
+        { _id: '507f1f77bcf86cd799439012' },
+        expect.objectContaining({
+          isActive: true,
+          isRedeemed: false,
+          $or: expect.any(Array),
+        }),
+        {
+          $or: [
+            { sourceType: 'community' },
+            { sourceType: { $exists: false } },
+          ],
+        },
+        { donatedBy: { $ne: '507f1f77bcf86cd799439022' } },
+      ],
     });
   });
 
@@ -694,31 +743,4 @@ describe('voucher routes', () => {
     expect(voucher.redeemedBy).toBe('507f1f77bcf86cd799439022');
   });
 
-  it('completes a campaign after its final unredeemed voucher is claimed', async () => {
-    const campaign = { _id: { toString: () => '507f1f77bcf86cd799439013' }, status: 'active' };
-    campaigns.push(campaign);
-    const voucher = {
-      _id: { toString: () => '507f1f77bcf86cd799439012' },
-      sourceType: 'campaign',
-      campaignId: campaign._id,
-      code: 'FINAL',
-      donatedBy: '507f1f77bcf86cd799439011',
-      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
-      isActive: true,
-      isRedeemed: false,
-    };
-    vouchers.push(voucher);
-    const token = signAuthToken({ userId: '507f1f77bcf86cd799439022' }, '1h');
-
-    await request(createApp())
-      .post('/api/vouchers/507f1f77bcf86cd799439012/redeem')
-      .set('Cookie', [`auth_token=${token}`])
-      .expect(200);
-
-    expect(campaign.status).toBe('completed');
-    expect(Campaign.findOneAndUpdate).toHaveBeenCalledWith(
-      { _id: campaign._id, status: 'active' },
-      { $set: { status: 'completed' } },
-    );
-  });
 });
