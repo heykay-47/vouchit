@@ -10,6 +10,7 @@ import type {
   SettlementInput,
 } from '@/lib/types';
 import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
+import { offersQueryKey } from '@/hooks/useOffersQuery';
 
 export const businessQueryKeys = {
   all: ['business'] as const,
@@ -98,6 +99,7 @@ export const useRecordSettlementMutation = () => {
         invalidateCampaign(queryClient, result.campaign.id),
         queryClient.invalidateQueries({ queryKey: businessQueryKeys.invoices() }),
         queryClient.invalidateQueries({ queryKey: vouchersQueryKey }),
+        queryClient.invalidateQueries({ queryKey: offersQueryKey }),
       ]);
     },
   });

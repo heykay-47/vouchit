@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { AuthContextType, SignupInput, User as AppUser } from '@/lib/types';
+import { offersQueryKey } from '@/hooks/useOffersQuery';
+import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -19,6 +22,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const mountedRef = useRef(true);
+  const queryClient = useQueryClient();
+
+  const clearViewerQueries = useCallback(() => {
+    queryClient.removeQueries({ queryKey: offersQueryKey });
+    queryClient.removeQueries({ queryKey: vouchersQueryKey });
+  }, [queryClient]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -27,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { user: apiUser } = await getCurrentUser();
         if (mountedRef.current) {
+          if (apiUser) clearViewerQueries();
           setUser(apiUser ?? null);
           setIsLoading(false);
         }
@@ -40,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleAuth401 = () => {
       if (mountedRef.current) {
         setUser(null);
+        clearViewerQueries();
         toast.error('Your session has expired. Please log in again.');
       }
     };
@@ -49,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       mountedRef.current = false;
       window.removeEventListener('auth:401', handleAuth401);
     };
-  }, []);
+  }, [clearViewerQueries]);
 
   const login = useCallback(async (email: string, password: string, rememberMe = false) => {
     setIsLoading(true);
@@ -64,11 +75,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error('Login failed');
       throw new Error('Login failed');
     }
+    clearViewerQueries();
     setUser(result.user);
     setIsLoading(false);
     toast.success('Welcome back!');
     return result.user;
-  }, []);
+  }, [clearViewerQueries]);
 
   const signup = useCallback(async (input: SignupInput) => {
     setIsLoading(true);
@@ -83,11 +95,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.error('Signup failed');
       throw new Error('Signup failed');
     }
+    clearViewerQueries();
     setUser(result.user);
     setIsLoading(false);
     toast.success('Account created successfully!');
     return result.user;
-  }, []);
+  }, [clearViewerQueries]);
 
   const logout = useCallback(async () => {
     setIsLoading(true);
@@ -98,8 +111,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success('Logged out successfully');
     }
     setUser(null);
+    clearViewerQueries();
     setIsLoading(false);
-  }, []);
+  }, [clearViewerQueries]);
 
   const updateProfile = useCallback(async (updates: Partial<AppUser>) => {
     if (!user) {

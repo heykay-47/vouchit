@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { createElement, type PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Campaign, Invoice } from '@/lib/types';
+import { offersQueryKey } from './useOffersQuery';
 import { vouchersQueryKey } from './useVouchersQuery';
 import { businessQueryKeys, useRecordSettlementMutation } from './useBusinessQueries';
 
@@ -20,7 +21,7 @@ describe('useRecordSettlementMutation', () => {
     recordSettlement.mockResolvedValue({ invoice, campaign });
   });
 
-  it('invalidates campaign, invoice, and public voucher queries after settlement', async () => {
+  it('invalidates campaign, invoice, voucher, and offer queries after settlement', async () => {
     const queryClient = new QueryClient();
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
     const wrapper = ({ children }: PropsWithChildren) => createElement(QueryClientProvider, { client: queryClient }, children);
@@ -35,10 +36,11 @@ describe('useRecordSettlementMutation', () => {
       },
     });
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledTimes(5));
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: businessQueryKeys.campaign(campaign.id) });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: businessQueryKeys.campaigns() });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: businessQueryKeys.invoices() });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: vouchersQueryKey });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: offersQueryKey });
   });
 });

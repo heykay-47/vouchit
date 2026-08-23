@@ -2,6 +2,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from '@/utils/toast';
 import { Voucher } from '@/lib/types';
 import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
+import { offersQueryKey } from '@/hooks/useOffersQuery';
 import { createLogger } from '@/utils/logger';
 import { voucherService } from '@/services/voucher.service';
 
@@ -18,6 +19,7 @@ export const useVoucherOperations = (setMutationError: (message: string | null) 
       toast.success('Voucher donated successfully');
       setMutationError(null);
       queryClient.invalidateQueries({ queryKey: vouchersQueryKey });
+      queryClient.invalidateQueries({ queryKey: offersQueryKey });
     },
     onError: (error: Error) => {
       voucherLogger.error('Error donating voucher', error);
@@ -38,6 +40,7 @@ export const useVoucherOperations = (setMutationError: (message: string | null) 
           voucher.id === redeemed.id ? { ...voucher, ...redeemed } : voucher
         ));
       });
+      queryClient.invalidateQueries({ queryKey: offersQueryKey });
     },
     onError: (error: Error) => {
       voucherLogger.error('Error redeeming voucher', error);
@@ -52,6 +55,7 @@ export const useVoucherOperations = (setMutationError: (message: string | null) 
       toast.success('Voucher reported as not working');
       setMutationError(null);
       queryClient.invalidateQueries({ queryKey: vouchersQueryKey });
+      queryClient.invalidateQueries({ queryKey: offersQueryKey });
     },
     onError: (error: Error) => {
       voucherLogger.error('Error reporting voucher', error);
