@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import {
+  useLocation,
+  useNavigationType,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   CampaignOfferCard,
   CampaignOfferDialog,
@@ -23,6 +27,10 @@ import type { CampaignOffer, OfferFilters as OfferFilterState } from '@/lib/type
 
 export default function Browse() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigationType = useNavigationType();
+  const previousLocationKey = useRef(location.key);
+  const [filterNavigationVersion, setFilterNavigationVersion] = useState(0);
   const [selected, setSelected] = useState<{
     offer: CampaignOffer;
     trigger: HTMLButtonElement;
@@ -34,6 +42,15 @@ export default function Browse() {
   const offers = flattenOfferPages(query.data?.pages ?? []);
   const total = query.data?.pages[0]?.total ?? 0;
   const firstPageError = query.isError && !query.data;
+
+  useLayoutEffect(() => {
+    const locationChanged = previousLocationKey.current !== location.key;
+    previousLocationKey.current = location.key;
+
+    if (locationChanged && navigationType === 'POP') {
+      setFilterNavigationVersion((version) => version + 1);
+    }
+  }, [location.key, navigationType]);
 
   const updateFilters = (
     next: OfferFilterState,
@@ -61,7 +78,11 @@ export default function Browse() {
       </header>
 
       <div className="mb-8">
-        <OfferFilters filters={filters} onChange={updateFilters} />
+        <OfferFilters
+          key={filterNavigationVersion}
+          filters={filters}
+          onChange={updateFilters}
+        />
       </div>
 
       {query.isPending && (

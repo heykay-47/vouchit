@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
 import type {
   CampaignOffer,
@@ -136,6 +136,19 @@ const browseTree = (route = '/browse') => (
 
 const renderBrowse = (route = '/browse') => render(browseTree(route));
 
+const NavigationHarness = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <button type="button" onClick={() => navigate(-1)}>go back</button>
+      <output data-testid="location-search">{location.search}</output>
+      <Browse />
+    </>
+  );
+};
+
 const setQuery = (
   overrides: Partial<ReturnType<typeof useOffersQuery>>,
 ) => {
@@ -164,6 +177,10 @@ describe('Browse', () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('restores URL filters and renders totals with the correct union cards', () => {
     setQuery({
       data: {
@@ -189,6 +206,44 @@ describe('Browse', () => {
       source: 'campaign',
       expiringSoon: true,
     });
+  });
+
+  it('does not let a pending search overwrite same-query history restoration', () => {
+    vi.useFakeTimers();
+    setQuery({
+      data: {
+        pages: [{ offers: [], total: 0, nextCursor: null, hasMore: false }],
+        pageParams: [null],
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            '/browse?q=saved&source=community&ref=restored',
+            '/browse?q=saved&source=campaign&ref=current',
+          ]}
+          initialIndex={1}
+        >
+          <NavigationHarness />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'search offers' }), {
+      target: { value: 'stale' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'go back' }));
+
+    expect(screen.getByRole('searchbox', { name: 'search offers' })).toHaveValue('saved');
+    expect(screen.getByTestId('location-search')).toHaveTextContent(
+      '?q=saved&source=community&ref=restored',
+    );
+
+    act(() => vi.advanceTimersByTime(300));
+    expect(screen.getByTestId('location-search')).toHaveTextContent(
+      '?q=saved&source=community&ref=restored',
+    );
   });
 
   it('de-duplicates appended pages by kind and id without hiding cross-kind ids', () => {

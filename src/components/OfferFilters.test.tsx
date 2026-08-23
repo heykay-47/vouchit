@@ -62,6 +62,31 @@ describe('OfferFilters', () => {
     );
   });
 
+  it('toggles expiry from the full row and its label text', () => {
+    const onChange = vi.fn();
+    const view = render(
+      <OfferFilters filters={DEFAULT_OFFER_FILTERS} onChange={onChange} />,
+    );
+
+    fireEvent.click(screen.getByTestId('expiry-filter'));
+    expect(onChange).toHaveBeenLastCalledWith(
+      { ...DEFAULT_OFFER_FILTERS, expiringSoon: true },
+      { replace: false },
+    );
+
+    view.rerender(
+      <OfferFilters
+        filters={{ ...DEFAULT_OFFER_FILTERS, expiringSoon: true }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('expiring within 7 days'));
+    expect(onChange).toHaveBeenLastCalledWith(
+      { ...DEFAULT_OFFER_FILTERS, expiringSoon: false },
+      { replace: false },
+    );
+  });
+
   it('applies platform, category, and source controls immediately', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
@@ -162,7 +187,8 @@ describe('OfferFilters', () => {
     for (const label of ['platform', 'category', 'source']) {
       expect(screen.getByRole('combobox', { name: label })).toHaveClass('h-11');
     }
-    expect(screen.getByTestId('expiry-filter')).toHaveClass('min-h-11');
+    expect(screen.getByTestId('expiry-filter')).toHaveClass('min-h-11', 'cursor-pointer');
+    expect(screen.getByTestId('expiry-filter')).toHaveAttribute('for', 'expiring-soon');
     expect(screen.getByRole('button', { name: 'clear filters' })).toHaveClass('h-11');
   });
 });

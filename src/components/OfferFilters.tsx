@@ -127,19 +127,18 @@ export function OfferFilters({ filters, onChange }: OfferFiltersProps) {
         </SelectContent>
       </Select>
 
-      <div
+      <Label
+        htmlFor="expiring-soon"
         data-testid="expiry-filter"
-        className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-input bg-background px-3 sm:justify-start"
+        className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md border border-input bg-background px-3 sm:justify-start"
       >
-        <Label htmlFor="expiring-soon" className="cursor-pointer leading-normal">
-          expiring within 7 days
-        </Label>
+        <span className="leading-normal">expiring within 7 days</span>
         <Switch
           id="expiring-soon"
           checked={filters.expiringSoon}
           onCheckedChange={(checked) => updateImmediately({ expiringSoon: checked })}
         />
-      </div>
+      </Label>
 
       {hasActiveFilters && (
         <Button type="button" variant="outline" className="h-11" onClick={clearFilters}>
