@@ -4,6 +4,11 @@ import { decodeOfferCursor, type OfferCursor } from './offer-cursor.js';
 
 export const OFFER_PLATFORMS = ['Google Pay', 'Paytm', 'PhonePe', 'Other'] as const;
 export const OFFER_CATEGORIES = ['Food', 'Shopping', 'Travel', 'Entertainment', 'Electronics', 'Health', 'Other'] as const;
+const offerLimitSchema = z.string()
+  .regex(/^(?:0|[1-9]\d*)$/)
+  .transform(Number)
+  .pipe(z.number().int().min(1).max(48))
+  .default('24');
 
 const rawOfferQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
@@ -11,7 +16,7 @@ const rawOfferQuerySchema = z.object({
   category: z.enum(OFFER_CATEGORIES).optional(),
   source: z.enum(['all', 'community', 'campaign']).default('all'),
   expiringSoon: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
-  limit: z.coerce.number().int().min(1).max(48).default(24),
+  limit: offerLimitSchema,
   cursor: z.string().max(512).optional(),
 }).strict();
 
@@ -156,7 +161,7 @@ const communityStages = (now: Date): OfferPipelineStage[] => [
       description: 1,
       platform: 1,
       imageUrl: 1,
-      expiryDate: 1,
+      expiryDate: { $ifNull: ['$expiryDate', null] },
       value: 1,
       donatedBy: 1,
       donatedAt: 1,
@@ -222,6 +227,7 @@ const campaignStages = (now: Date): OfferPipelineStage[] => [
       category: 1,
       imageUrl: 1,
       expiryDate: 1,
+      value: 1,
       brandName: 1,
       organizationName: { $arrayElemAt: ['$profile.organizationName', 0] },
       remainingCount: 1,

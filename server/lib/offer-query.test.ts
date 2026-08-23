@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { ZodError } from 'zod';
+import { encodeOfferCursor } from './offer-cursor.js';
 import {
   buildCursorMatch,
   buildOfferPipeline,
@@ -10,6 +11,7 @@ import {
   escapeSearchPattern,
   parseOfferQuery,
 } from './offer-query.js';
+import { toPublicOffer, type OfferAggregateRow } from './offer-serializer.js';
 
 const now = new Date('2026-08-23T00:00:00.000Z');
 
@@ -39,6 +41,9 @@ describe('offer query primitives', () => {
     { q: 'x'.repeat(101) },
     { cursor: 'x'.repeat(513) },
     { expiringSoon: '1' },
+    { limit: ['24'] },
+    { limit: true },
+    { limit: 24 },
     { limit: '0' },
     { limit: '49' },
   ])('rejects malformed query %j as a Zod error', (query) => {
@@ -162,6 +167,8 @@ describe('offer query primitives', () => {
         ],
       },
     ] } });
+    const communityProjection = pipeline[1].$project as Record<string, unknown>;
+    expect(communityProjection.expiryDate).toEqual({ $ifNull: ['$expiryDate', null] });
     expect(union.coll).toBe('campaigns');
     expect(union.pipeline).toContainEqual({ $match: {
       status: 'active',
@@ -186,6 +193,26 @@ describe('offer query primitives', () => {
       remainingCount: { $ifNull: [{ $first: '$inventory.remainingCount' }, 0] },
     } });
     expect(union.pipeline).toContainEqual({ $match: { remainingCount: { $gt: 0 } } });
+    const campaignProjection = union.pipeline.find((stage) => '$project' in stage)?.$project as Record<string, unknown>;
+    expect(campaignProjection.value).toBe(1);
+
+    const campaignRow: OfferAggregateRow = {
+      _id: '507f1f77bcf86cd799439012',
+      kind: 'campaign',
+      title: 'Business reward',
+      description: 'Published inventory',
+      terms: 'One per customer',
+      platform: 'Google Pay',
+      category: 'Shopping',
+      imageUrl: 'https://example.com/campaign.png',
+      expiryDate: new Date('2026-09-02T00:00:00.000Z'),
+      value: 'INR 200',
+      brandName: 'Fresh Rewards',
+      organizationName: 'Fresh Market Ltd',
+      remainingCount: 3,
+      missingExpiry: 0,
+    };
+    expect(toPublicOffer(campaignRow)).toMatchObject({ value: 'INR 200' });
 
     expect(pipeline).toContainEqual({
       $set: { missingExpiry: { $cond: [{ $eq: ['$expiryDate', null] }, 1, 0] } },
@@ -203,13 +230,19 @@ describe('offer query primitives', () => {
   });
 
   it('places public filters, search, cursor, and viewer stages before the facet', () => {
+    const cursor = encodeOfferCursor({
+      missingExpiry: 0,
+      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+      kind: 'community',
+      id: '507f1f77bcf86cd799439011',
+    });
     const pipeline = buildOfferPipeline({
       source: 'campaign',
       expiringSoon: false,
       limit: 24,
       now,
       q: 'fresh.*',
-      cursor: undefined,
+      cursor,
       viewerId: '507f1f77bcf86cd799439022',
       viewerRole: 'customer',
     });
@@ -221,7 +254,7 @@ describe('offer query primitives', () => {
       now,
       q: 'fresh.*',
       limit: 24,
-      cursor: undefined,
+      cursor,
       viewerId: '507f1f77bcf86cd799439022',
       viewerRole: 'customer',
     }) };
@@ -234,10 +267,18 @@ describe('offer query primitives', () => {
     expect(searchIndex).toBeGreaterThan(unionIndex);
     expect(facetIndex).toBeGreaterThan(searchIndex);
     expect(facetIndex).toBeGreaterThan(publicIndex);
+    const facet = pipeline[facetIndex].$facet as {
+      metadata: Record<string, unknown>[];
+      page: Record<string, unknown>[];
+    };
+    expect(pipeline.slice(0, facetIndex)).not.toContainEqual({ $match: buildCursorMatch(cursor) });
+    expect(facet.metadata).toEqual([{ $count: 'total' }]);
+    expect(facet.page[0]).toEqual({ $match: buildCursorMatch(cursor) });
     expect(pipeline[facetIndex]).toEqual({
       $facet: {
         metadata: [{ $count: 'total' }],
         page: [
+          { $match: buildCursorMatch(cursor) },
           { $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } },
           { $limit: 25 },
         ],
