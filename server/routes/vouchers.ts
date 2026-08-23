@@ -59,9 +59,12 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
         ],
       }
     : publicFilter;
+  const sort = viewerId
+    ? { redeemedAt: -1 as const, donatedAt: -1 as const }
+    : { donatedAt: -1 as const };
   const vouchers = await Voucher
     .find(query)
-    .sort({ donatedAt: -1 })
+    .sort(sort)
     .skip(offset)
     .limit(limit)
     .lean();

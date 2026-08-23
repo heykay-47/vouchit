@@ -14,6 +14,7 @@ const profiles: any[] = [];
 process.env.JWT_SECRET = 'test-secret';
 const customerId = '507f1f77bcf86cd799439022';
 const customerToken = signAuthToken({ userId: customerId }, '1h');
+const voucherSort = vi.hoisted(() => vi.fn());
 let voucherSequence = 40;
 const makeVoucher = (overrides: Record<string, unknown> = {}) => {
   const id = `507f1f77bcf86cd7994390${voucherSequence++}`;
@@ -53,11 +54,12 @@ vi.mock('../models/Activity', () => ({ Activity: { create: vi.fn(async () => ({}
 vi.mock('../models/Voucher', () => {
   let query: any = {};
   const chain = {
-    sort: () => chain,
+    sort: voucherSort,
     skip: () => chain,
     limit: () => chain,
     lean: async () => vouchers.filter((voucher) => matchesFilter(voucher, query)),
   };
+  voucherSort.mockImplementation(() => chain);
   return {
     Voucher: {
       find: vi.fn((filter: any) => {
@@ -417,6 +419,15 @@ describe('voucher routes', () => {
       .expect(200);
 
     expect(Voucher.find).toHaveBeenCalledWith(expect.objectContaining({ $or: expect.any(Array) }));
+  });
+
+  it('orders an authenticated customer recent redemption before public inventory', async () => {
+    await request(createApp())
+      .get('/api/vouchers')
+      .set('Cookie', [`auth_token=${customerToken}`])
+      .expect(200);
+
+    expect(voucherSort).toHaveBeenCalledWith({ redeemedAt: -1, donatedAt: -1 });
   });
 
   it('excludes inactive, expired, and unpaid campaign inventory from the public list', async () => {
