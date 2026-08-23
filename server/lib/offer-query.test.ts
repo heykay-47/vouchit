@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mongoose from 'mongoose';
 import { ZodError } from 'zod';
-import { encodeOfferCursor } from './offer-cursor.js';
+import { decodeOfferCursor, encodeOfferCursor } from './offer-cursor.js';
 import {
   buildCursorMatch,
   buildOfferPipeline,
@@ -14,6 +14,12 @@ import {
 import { toPublicOffer, type OfferAggregateRow } from './offer-serializer.js';
 
 const now = new Date('2026-08-23T00:00:00.000Z');
+const decodedCursor = decodeOfferCursor(encodeOfferCursor({
+  missingExpiry: 0,
+  expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+  kind: 'community',
+  id: '507f1f77bcf86cd799439011',
+}));
 
 describe('offer query primitives', () => {
   it('parses bounded canonical offer filters', () => {
@@ -64,6 +70,38 @@ describe('offer query primitives', () => {
     });
   });
 
+  it.each([
+    ['platform', { platform: 'Google Pay' }, { platform: 'Google Pay' }],
+    ['category', { category: 'Shopping' }, { category: 'Shopping' }],
+    ['community source', { source: 'community' }, { kind: 'community' }],
+    ['campaign source', { source: 'campaign' }, { kind: 'campaign' }],
+    ['seven-day expiry', { expiringSoon: true }, {
+      expiryDate: { $gt: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
+    }],
+  ] as const)('builds the exact %s predicate', (_name, input, expected) => {
+    expect(buildPublicMatch({
+      now,
+      source: 'all',
+      expiringSoon: false,
+      ...input,
+    })).toEqual(expected);
+  });
+
+  it('combines all public filters without replacing a predicate', () => {
+    expect(buildPublicMatch({
+      now,
+      platform: 'Google Pay',
+      category: 'Shopping',
+      source: 'campaign',
+      expiringSoon: true,
+    })).toEqual({
+      platform: 'Google Pay',
+      category: 'Shopping',
+      kind: 'campaign',
+      expiryDate: { $gt: now, $lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) },
+    });
+  });
+
   it('builds literal case-insensitive search across public text only', () => {
     expect(buildSearchMatch('fresh.*')).toEqual({
       $or: [
@@ -77,14 +115,16 @@ describe('offer query primitives', () => {
     });
   });
 
+  it.each(['.', '.*', '[abc]', 'a+b', 'foo(bar)'])('treats search input %s literally', (q) => {
+    expect(buildSearchMatch(q)).toEqual({ $or: [
+      'title', 'description', 'platform', 'category', 'brandName', 'organizationName',
+    ].map((field) => ({
+      [field]: { $regex: escapeSearchPattern(q), $options: 'i' },
+    })) });
+  });
+
   it('builds a strict cursor boundary for the stable tuple', () => {
-    const stage = buildCursorMatch({
-      version: 1,
-      missingExpiry: 0,
-      expiryDate: new Date('2026-09-01T00:00:00.000Z'),
-      kind: 'campaign',
-      id: '507f1f77bcf86cd799439011',
-    });
+    const stage = buildCursorMatch(decodedCursor);
 
     expect(stage).toEqual({
       $or: [
@@ -93,12 +133,12 @@ describe('offer query primitives', () => {
         {
           missingExpiry: 0,
           expiryDate: new Date('2026-09-01T00:00:00.000Z'),
-          kind: { $gt: 'campaign' },
+          kind: { $gt: 'community' },
         },
         {
           missingExpiry: 0,
           expiryDate: new Date('2026-09-01T00:00:00.000Z'),
-          kind: 'campaign',
+          kind: 'community',
           _id: { $gt: new mongoose.Types.ObjectId('507f1f77bcf86cd799439011') },
         },
       ],
@@ -141,6 +181,58 @@ describe('offer query primitives', () => {
     expect(buildViewerClaimStages({ viewerId: '507f1f77bcf86cd799439022', viewerRole: 'business' }))
       .toEqual([]);
     expect(buildViewerClaimStages({})).toEqual([]);
+  });
+
+  it('counts all matches before applying the cursor to the page branch', () => {
+    const pipeline = buildOfferPipeline({
+      now,
+      source: 'all',
+      expiringSoon: false,
+      limit: 2,
+      cursor: decodedCursor,
+    });
+    const facet = pipeline.find((stage) => '$facet' in stage)?.$facet as {
+      metadata: Record<string, unknown>[];
+      page: Record<string, unknown>[];
+    };
+
+    expect(facet.metadata).toEqual([{ $count: 'total' }]);
+    expect(facet.page[0]).toEqual({ $match: buildCursorMatch(decodedCursor) });
+  });
+
+  it('keeps no-expiry offers after every dated offer in the stable page order', () => {
+    const pipeline = buildOfferPipeline({
+      now,
+      source: 'all',
+      expiringSoon: false,
+      limit: 2,
+    });
+    const facet = pipeline.find((stage) => '$facet' in stage)?.$facet as {
+      page: Record<string, unknown>[];
+    };
+
+    expect(facet.page[0]).toEqual({ $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } });
+  });
+
+  it('continues after a removed previous-page row using the full stable tuple', () => {
+    const pipeline = buildOfferPipeline({
+      now,
+      source: 'all',
+      expiringSoon: false,
+      limit: 2,
+      cursor: decodedCursor,
+    });
+    const facet = pipeline.find((stage) => '$facet' in stage)?.$facet as {
+      metadata: Record<string, unknown>[];
+      page: Record<string, unknown>[];
+    };
+
+    expect(facet.metadata).toEqual([{ $count: 'total' }]);
+    expect(facet.page).toEqual([
+      { $match: buildCursorMatch(decodedCursor) },
+      { $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } },
+      { $limit: 3 },
+    ]);
   });
 
   it('groups only eligible campaign inventory before public pagination', () => {

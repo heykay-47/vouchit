@@ -1,6 +1,20 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
+import { buildViewerClaimStages } from '../lib/offer-query.js';
+import { signAuthToken } from '../lib/token.js';
+import { User } from '../models/User.js';
+
+const customerId = '507f1f77bcf86cd799439022';
+const businessId = '507f1f77bcf86cd799439099';
+process.env.JWT_SECRET = 'test-secret';
+
+const viewerState = vi.hoisted(() => ({
+  users: {
+    '507f1f77bcf86cd799439022': { role: 'customer' },
+    '507f1f77bcf86cd799439099': { role: 'business' },
+  } as Record<string, { role: string }>,
+}));
 
 const offerState = vi.hoisted(() => ({
   pipeline: [] as Record<string, unknown>[],
@@ -52,10 +66,21 @@ vi.mock('../models/Voucher', () => ({
   },
 }));
 
+vi.mock('../models/User', () => ({
+  User: {
+    findById: vi.fn((id: string) => ({
+      select: vi.fn(() => ({
+        lean: vi.fn(async () => viewerState.users[id] ?? null),
+      })),
+    })),
+  },
+}));
+
 const lastPipeline = () => offerState.pipeline;
 
 describe('offer routes', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     offerState.pipeline = [];
     offerState.rows = [];
   });
@@ -88,5 +113,45 @@ describe('offer routes', () => {
         ],
       },
     });
+  });
+
+  it('resolves an authenticated customer role and captures the exact claim exclusion stages', async () => {
+    const response = await request(createApp())
+      .get('/api/offers?source=campaign')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: customerId }, '1h')}`])
+      .expect(200);
+
+    expect(response.body.data.offers).toEqual([]);
+    expect(User.findById).toHaveBeenCalledWith(customerId);
+
+    const claimStages = buildViewerClaimStages({ viewerId: customerId, viewerRole: 'customer' });
+    const claimIndex = lastPipeline().findIndex((stage) => '$lookup' in stage);
+    expect(lastPipeline().slice(claimIndex, claimIndex + claimStages.length)).toEqual(claimStages);
+  });
+
+  it('keeps an active campaign visible to anonymous and business viewers', async () => {
+    offerState.rows.push(campaignAggregateRow);
+
+    const anonymousResponse = await request(createApp()).get('/api/offers').expect(200);
+    expect(anonymousResponse.body.data.offers).toHaveLength(1);
+    expect(User.findById).not.toHaveBeenCalled();
+    expect(lastPipeline()).not.toContainEqual({ $match: { viewerClaimed: false } });
+
+    const businessResponse = await request(createApp())
+      .get('/api/offers')
+      .set('Cookie', [`auth_token=${signAuthToken({ userId: businessId }, '1h')}`])
+      .expect(200);
+    expect(businessResponse.body.data.offers).toHaveLength(1);
+    expect(User.findById).toHaveBeenCalledWith(businessId);
+    expect(lastPipeline()).not.toContainEqual({ $match: { viewerClaimed: false } });
+  });
+
+  it('rejects a malformed cursor before executing the aggregate', async () => {
+    const response = await request(createApp())
+      .get('/api/offers?cursor=not-a-cursor')
+      .expect(400);
+
+    expect(response.body.error.message).toBe('Invalid offer cursor');
+    expect(lastPipeline()).toEqual([]);
   });
 });
