@@ -63,7 +63,11 @@ export const signOut = async (): Promise<AuthResult> => {
 };
 
 export const getCurrentUser = async () => {
-  const result = await apiRequest<{ user: ApiUser }>('/api/auth/me');
+  const result = await apiRequest<{ user: ApiUser }>(
+    '/api/auth/me',
+    {},
+    { suppressAuthEvent: true },
+  );
   return { ...result, user: hydrateUser(result.user) };
 };
 

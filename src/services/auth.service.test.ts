@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest } from './api-client';
-import { signInWithEmail, signUpWithEmail } from './auth.service';
+import { getCurrentUser, signInWithEmail, signUpWithEmail } from './auth.service';
 import type { SignupInput } from '@/lib/types';
 
 vi.mock('./api-client', () => ({
@@ -70,5 +70,16 @@ describe('auth service', () => {
       body: JSON.stringify({ email: 'ops@example.com', password: 'secret123', rememberMe: true }),
     }, { suppressAuthEvent: true });
     expect(result.user?.createdAt).toEqual(new Date(apiUser.createdAt));
+  });
+
+  it('handles current-user authorization locally', async () => {
+    const result = await getCurrentUser();
+
+    expect(mockedApiRequest).toHaveBeenCalledWith(
+      '/api/auth/me',
+      {},
+      { suppressAuthEvent: true },
+    );
+    expect(result.user.createdAt).toEqual(new Date(apiUser.createdAt));
   });
 });

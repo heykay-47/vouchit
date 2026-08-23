@@ -36,4 +36,18 @@ describe('apiRequest', () => {
     expect(auth401).not.toHaveBeenCalled();
     window.removeEventListener('auth:401', auth401);
   });
+
+  it('dispatches the auth event for an unsuppressed unauthorized response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      data: null,
+      error: { message: 'Authentication required' },
+    }), { status: 401 })));
+    const auth401 = vi.fn();
+    window.addEventListener('auth:401', auth401);
+
+    await expect(apiRequest('/api/users/me')).rejects.toMatchObject({ status: 401 });
+
+    expect(auth401).toHaveBeenCalledOnce();
+    window.removeEventListener('auth:401', auth401);
+  });
 });

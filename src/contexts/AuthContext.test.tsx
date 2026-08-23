@@ -102,8 +102,12 @@ const renderAuthWithViewerQueries = () => render(
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => { resolve = resolvePromise; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 };
 
 const expectActiveVouchers = async (summary: string) => {
@@ -282,6 +286,85 @@ describe('AuthProvider viewer cache safety', () => {
 
     await act(async () => recovery.resolve({ user: authenticatedUser }));
     await expectActiveVouchers('PUBLIC:public');
+  });
+
+  it('ignores a stale recovery 401 after login resolves a viewer', async () => {
+    const recovery = deferred<{ user: User }>();
+    authServiceMocks.getCurrentUser
+      .mockRejectedValueOnce(new ApiClientError('Network error', 0))
+      .mockReturnValueOnce(recovery.promise);
+    voucherServiceMocks.list.mockResolvedValueOnce([firstPrivateVoucher]);
+    renderAuthWithVouchers();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    let recoveryRequest!: Promise<void>;
+    act(() => { recoveryRequest = auth.refreshUser(); });
+    await waitFor(() => expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(2));
+
+    await act(async () => auth.login('customer@example.com', 'password123'));
+    await expectActiveVouchers('PRIVATE-ONE:CODE-ONE');
+
+    await act(async () => {
+      recovery.reject(new ApiClientError('Authentication required', 401));
+      await recoveryRequest;
+    });
+
+    expect(auth.user).toEqual(authenticatedUser);
+    expect(auth.viewerKey).toBe(authenticatedUser.id);
+    expect(screen.getByTestId('active-vouchers')).toHaveTextContent('PRIVATE-ONE:CODE-ONE');
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start viewer recovery while login is pending', async () => {
+    const loginResult = deferred<{ success: boolean; user: User }>();
+    authServiceMocks.getCurrentUser.mockRejectedValueOnce(new ApiClientError('Network error', 0));
+    authServiceMocks.signInWithEmail.mockReturnValueOnce(loginResult.promise);
+    renderAuth();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    let loginRequest!: Promise<User>;
+    act(() => { loginRequest = auth.login('customer@example.com', 'password123'); });
+    await act(async () => auth.refreshUser());
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+
+    expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      loginResult.resolve({ success: true, user: authenticatedUser });
+      await loginRequest;
+    });
+
+    expect(auth.user).toEqual(authenticatedUser);
+  });
+
+  it('ignores a stale authenticated recovery after logout resolves anonymous', async () => {
+    const recovery = deferred<{ user: User }>();
+    authServiceMocks.getCurrentUser
+      .mockResolvedValueOnce({ user: authenticatedUser })
+      .mockReturnValueOnce(recovery.promise);
+    voucherServiceMocks.list
+      .mockResolvedValueOnce([firstPrivateVoucher])
+      .mockResolvedValueOnce([publicVoucher]);
+    renderAuthWithVouchers();
+    await expectActiveVouchers('PRIVATE-ONE:CODE-ONE');
+
+    let recoveryRequest!: Promise<void>;
+    act(() => { recoveryRequest = auth.refreshUser(); });
+    await waitFor(() => expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(2));
+
+    await act(async () => auth.logout());
+    await expectActiveVouchers('PUBLIC:public');
+
+    await act(async () => {
+      recovery.resolve({ user: secondUser });
+      await recoveryRequest;
+    });
+
+    expect(auth.user).toBeNull();
+    expect(auth.viewerKey).toBe('anonymous');
+    expect(screen.getByTestId('active-vouchers')).toHaveTextContent('PUBLIC:public');
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(2);
   });
 
   it('removes unresolved reconnect recovery when the provider unmounts', async () => {

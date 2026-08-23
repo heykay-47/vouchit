@@ -26,6 +26,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const userRef = useRef<AppUser | null>(null);
   const isViewerResolvedRef = useRef(false);
   const authRequestRef = useRef<Promise<void> | null>(null);
+  const authGenerationRef = useRef(0);
+  const authTransitionRef = useRef(false);
   const queryClient = useQueryClient();
 
   const clearViewerQueries = useCallback(() => {
@@ -33,13 +35,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     queryClient.removeQueries({ queryKey: vouchersQueryKey });
   }, [queryClient]);
 
+  const invalidateViewerResolution = useCallback(() => {
+    authGenerationRef.current += 1;
+    authRequestRef.current = null;
+  }, []);
+
   const resolveViewer = useCallback(() => {
+    if (authTransitionRef.current) return Promise.resolve();
     if (authRequestRef.current) return authRequestRef.current;
 
+    const generation = authGenerationRef.current;
     const request = (async () => {
       try {
         const { user: apiUser } = await getCurrentUser();
-        if (mountedRef.current) {
+        if (mountedRef.current && generation === authGenerationRef.current) {
           if (apiUser && apiUser.id !== userRef.current?.id) clearViewerQueries();
           userRef.current = apiUser ?? null;
           isViewerResolvedRef.current = true;
@@ -47,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsViewerResolved(true);
         }
       } catch (error) {
-        if (mountedRef.current) {
+        if (mountedRef.current && generation === authGenerationRef.current) {
           if (error instanceof ApiClientError && error.status === 401) {
             if (!isViewerResolvedRef.current || userRef.current !== null) clearViewerQueries();
             userRef.current = null;
@@ -59,8 +68,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } finally {
-        authRequestRef.current = null;
-        if (mountedRef.current) setIsLoading(false);
+        if (generation === authGenerationRef.current) {
+          authRequestRef.current = null;
+          if (mountedRef.current) setIsLoading(false);
+        }
       }
     })();
 
@@ -74,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleAuth401 = () => {
       if (mountedRef.current) {
+        invalidateViewerResolution();
         userRef.current = null;
         isViewerResolvedRef.current = true;
         setUser(null);
@@ -92,17 +104,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('auth:401', handleAuth401);
       unsubscribeOnline();
     };
-  }, [clearViewerQueries, resolveViewer]);
+  }, [clearViewerQueries, invalidateViewerResolution, resolveViewer]);
 
   const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+    authTransitionRef.current = true;
+    invalidateViewerResolution();
     setIsLoading(true);
     const result = await signInWithEmail(email, password, rememberMe);
     if (!result.success) {
+      authTransitionRef.current = false;
       setIsLoading(false);
       toast.error(result.error || 'Login failed');
       throw new Error(result.error);
     }
     if (!result.user) {
+      authTransitionRef.current = false;
       setIsLoading(false);
       toast.error('Login failed');
       throw new Error('Login failed');
@@ -112,20 +128,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isViewerResolvedRef.current = true;
     setUser(result.user);
     setIsViewerResolved(true);
+    authTransitionRef.current = false;
     setIsLoading(false);
     toast.success('Welcome back!');
     return result.user;
-  }, [clearViewerQueries]);
+  }, [clearViewerQueries, invalidateViewerResolution]);
 
   const signup = useCallback(async (input: SignupInput) => {
+    authTransitionRef.current = true;
+    invalidateViewerResolution();
     setIsLoading(true);
     const result = await signUpWithEmail(input);
     if (!result.success) {
+      authTransitionRef.current = false;
       setIsLoading(false);
       toast.error(result.error || 'Signup failed');
       throw new Error(result.error);
     }
     if (!result.user) {
+      authTransitionRef.current = false;
       setIsLoading(false);
       toast.error('Signup failed');
       throw new Error('Signup failed');
@@ -135,15 +156,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isViewerResolvedRef.current = true;
     setUser(result.user);
     setIsViewerResolved(true);
+    authTransitionRef.current = false;
     setIsLoading(false);
     toast.success('Account created successfully!');
     return result.user;
-  }, [clearViewerQueries]);
+  }, [clearViewerQueries, invalidateViewerResolution]);
 
   const logout = useCallback(async () => {
+    authTransitionRef.current = true;
+    invalidateViewerResolution();
     setIsLoading(true);
     const result = await signOut();
     if (!result.success) {
+      authTransitionRef.current = false;
       toast.error('Logout failed');
       setIsLoading(false);
       return;
@@ -154,8 +179,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setIsViewerResolved(true);
     clearViewerQueries();
+    authTransitionRef.current = false;
     setIsLoading(false);
-  }, [clearViewerQueries]);
+  }, [clearViewerQueries, invalidateViewerResolution]);
 
   const updateProfile = useCallback(async (updates: Partial<AppUser>) => {
     if (!user) {
