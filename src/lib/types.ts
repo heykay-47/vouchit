@@ -267,3 +267,60 @@ export interface Contributor {
   donationCount: number;
   totalDonated: number;
 }
+
+export type OfferKind = 'community' | 'campaign';
+export type OfferSourceFilter = 'all' | OfferKind;
+
+export interface OfferFilters {
+  q: string;
+  platform?: VoucherPlatform;
+  category?: VoucherCategory;
+  source: OfferSourceFilter;
+  expiringSoon: boolean;
+}
+
+export interface OfferBase {
+  id: string;
+  kind: OfferKind;
+  title: string;
+  description: string;
+  platform: VoucherPlatform;
+  category: VoucherCategory | undefined;
+  imageUrl: string;
+  expiryDate: Date | undefined;
+  value?: string;
+}
+
+export interface CommunityOffer extends OfferBase {
+  kind: 'community';
+  sourceType: 'community';
+  donatedBy: string;
+  donatedAt: Date;
+  isRedeemed: false;
+  reportCount: number;
+  isActive: true;
+}
+
+export interface CampaignOffer extends OfferBase {
+  kind: 'campaign';
+  terms: string;
+  category: VoucherCategory;
+  expiryDate: Date;
+  brandName: string;
+  organizationName: string;
+  remainingCount: number;
+}
+
+export type Offer = CommunityOffer | CampaignOffer;
+
+export interface OfferPage {
+  offers: Offer[];
+  total: number;
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface CampaignClaimResponse {
+  voucher: ResolvedVoucher;
+  message: string;
+}
