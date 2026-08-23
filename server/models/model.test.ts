@@ -6,6 +6,7 @@ import { ReportedVoucher } from './ReportedVoucher.js';
 import { BusinessProfile } from './BusinessProfile.js';
 import { Campaign } from './Campaign.js';
 import { Invoice } from './Invoice.js';
+import { RedeemedVoucher } from './RedeemedVoucher.js';
 
 describe('mongoose models', () => {
   it('defines core collection names', () => {
@@ -161,6 +162,33 @@ describe('mongoose models', () => {
         expect.objectContaining({
           unique: true,
           partialFilterExpression: { externalPaymentReference: { $type: 'string' } },
+        }),
+      ],
+    ]));
+  });
+
+  it('keeps campaign identity optional on redemption history', () => {
+    const community = new RedeemedVoucher({
+      userId: '507f1f77bcf86cd799439011',
+      voucherId: '507f1f77bcf86cd799439012',
+    });
+    const campaign = new RedeemedVoucher({
+      userId: '507f1f77bcf86cd799439011',
+      voucherId: '507f1f77bcf86cd799439013',
+      campaignId: '507f1f77bcf86cd799439014',
+    });
+
+    expect(community.validateSync()).toBeUndefined();
+    expect(campaign.validateSync()).toBeUndefined();
+  });
+
+  it('allows only one redemption per customer and campaign', () => {
+    expect(RedeemedVoucher.schema.indexes()).toEqual(expect.arrayContaining([
+      [
+        { userId: 1, campaignId: 1 },
+        expect.objectContaining({
+          unique: true,
+          partialFilterExpression: { campaignId: { $type: 'objectId' } },
         }),
       ],
     ]));

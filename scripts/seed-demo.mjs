@@ -471,9 +471,17 @@ favoriteSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 const redeemedVoucherSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   voucherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Voucher', required: true },
+  campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', default: null },
   redeemedAt: { type: Date, required: true },
 }, { timestamps: false });
 redeemedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
+redeemedVoucherSchema.index(
+  { userId: 1, campaignId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { campaignId: { $type: 'objectId' } },
+  },
+);
 
 const reportedVoucherSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -683,10 +691,18 @@ const run = async () => {
 
   for (const fixture of fixtures.vouchers.filter((item) => item.isRedeemed)) {
     const voucher = vouchers[fixture.code];
+    const redemptionCampaignId = fixture.campaignKey
+      ? campaigns[fixture.campaignKey]._id
+      : null;
     await upsertFixture(
       RedeemedVoucher,
       { userId: voucher.redeemedBy, voucherId: voucher._id },
-      { userId: voucher.redeemedBy, voucherId: voucher._id, redeemedAt: fixture.redeemedAt },
+      {
+        userId: voucher.redeemedBy,
+        voucherId: voucher._id,
+        campaignId: redemptionCampaignId,
+        redeemedAt: fixture.redeemedAt,
+      },
     );
   }
 

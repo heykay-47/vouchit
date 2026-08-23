@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildDemoFixtures,
@@ -82,5 +84,24 @@ describe('demo seed fixtures', () => {
     ], plan)).toEqual([
       { campaignKey: 'active-campaign', code: 'STALE-CODE' },
     ]);
+  });
+
+  it('maps redeemed campaign fixtures to one customer-campaign claim', () => {
+    const fixtures = buildDemoFixtures(fixedNow);
+    const redeemedCampaigns = fixtures.vouchers.filter((voucher) => (
+      voucher.campaignKey && voucher.isRedeemed && voucher.redeemedByKey
+    ));
+
+    expect(redeemedCampaigns.length).toBeGreaterThan(0);
+    expect(new Set(redeemedCampaigns.map((voucher) => (
+      `${voucher.redeemedByKey}:${voucher.campaignKey}`
+    ))).size).toBe(redeemedCampaigns.length);
+  });
+
+  it('keeps the duplicate seed redemption schema campaign-aware', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/seed-demo.mjs'), 'utf8');
+
+    expect(source).toContain("campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', default: null }");
+    expect(source).toContain("partialFilterExpression: { campaignId: { $type: 'objectId' } }");
   });
 });
