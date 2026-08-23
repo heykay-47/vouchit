@@ -20,7 +20,7 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
     ? await User.findById(viewerId).select('role').lean() as { role?: unknown } | null
     : null;
   const viewerRole = viewer ? resolveUserRole(viewer.role) : undefined;
-  const cursor = parsed.cursor ? decodeOfferCursor(parsed.cursor) : undefined;
+  const cursor = parsed.cursor !== undefined ? decodeOfferCursor(parsed.cursor) : undefined;
   const pipeline = buildOfferPipeline({
     ...parsed,
     cursor,

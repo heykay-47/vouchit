@@ -214,7 +214,7 @@ describe('offer query primitives', () => {
     expect(facet.page[0]).toEqual({ $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } });
   });
 
-  it('continues after a removed previous-page row using the full stable tuple', () => {
+  it('builds the page stages for stable tuple continuation', () => {
     const pipeline = buildOfferPipeline({
       now,
       source: 'all',
@@ -233,6 +233,39 @@ describe('offer query primitives', () => {
       { $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } },
       { $limit: 3 },
     ]);
+  });
+
+  it('keeps the next tuple reachable when the previous-page row is removed', () => {
+    type StableOfferTuple = {
+      missingExpiry: 0 | 1;
+      expiryDate: Date | null;
+      kind: 'community' | 'campaign';
+      id: string;
+    };
+    const removedRow = {
+      missingExpiry: 0 as const,
+      expiryDate: decodedCursor.expiryDate,
+      kind: decodedCursor.kind,
+      id: decodedCursor.id,
+    } satisfies StableOfferTuple;
+    const nextRow: StableOfferTuple = { ...removedRow, id: '507f1f77bcf86cd799439012' };
+    const laterRow: StableOfferTuple = {
+      missingExpiry: 1 as const,
+      expiryDate: null,
+      kind: 'community' as const,
+      id: '507f1f77bcf86cd799439013',
+    };
+    const compareTuples = (left: StableOfferTuple, right: StableOfferTuple) => (
+      left.missingExpiry - right.missingExpiry
+      || (left.expiryDate?.getTime() ?? Number.POSITIVE_INFINITY)
+        - (right.expiryDate?.getTime() ?? Number.POSITIVE_INFINITY)
+      || (left.kind === right.kind ? 0 : left.kind === 'community' ? -1 : 1)
+      || left.id.localeCompare(right.id)
+    );
+
+    expect(compareTuples(removedRow, decodedCursor)).toBe(0);
+    expect(compareTuples(nextRow, decodedCursor)).toBeGreaterThan(0);
+    expect(compareTuples(laterRow, decodedCursor)).toBeGreaterThan(0);
   });
 
   it('groups only eligible campaign inventory before public pagination', () => {

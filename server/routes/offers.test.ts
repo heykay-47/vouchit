@@ -154,4 +154,13 @@ describe('offer routes', () => {
     expect(response.body.error.message).toBe('Invalid offer cursor');
     expect(lastPipeline()).toEqual([]);
   });
+
+  it('rejects an explicitly empty cursor before executing the aggregate', async () => {
+    const response = await request(createApp())
+      .get('/api/offers?cursor=')
+      .expect(400);
+
+    expect(response.body.error.message).toBe('Invalid offer cursor');
+    expect(lastPipeline()).toEqual([]);
+  });
 });
