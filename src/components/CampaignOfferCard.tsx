@@ -175,7 +175,7 @@ export function CampaignOfferDialog({
           if (pendingAuthHandoff) {
             event.preventDefault();
             setPendingAuthHandoff(false);
-            openLogin(trigger);
+            openLogin(trigger?.isConnected ? trigger : focusFallback);
             return;
           }
           if (trigger?.isConnected) {

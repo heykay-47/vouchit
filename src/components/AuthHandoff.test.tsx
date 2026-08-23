@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import type { CampaignOffer, Voucher } from '@/lib/types';
@@ -73,23 +73,30 @@ const campaignOffer: CampaignOffer = {
   remainingCount: 3,
 };
 
-function CampaignHarness() {
+function CampaignHarness({ showCampaign = true }: { showCampaign?: boolean }) {
   const [open, setOpen] = useState(false);
   const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
+  const focusFallback = useRef<HTMLOutputElement>(null);
 
   return (
     <>
-      <CampaignOfferCard
-        offer={campaignOffer}
-        onOpen={(_offer, nextTrigger) => {
-          setTrigger(nextTrigger);
-          setOpen(true);
-        }}
-      />
+      <output ref={focusFallback} tabIndex={-1}>
+        {showCampaign ? '1 offer found' : '0 offers found'}
+      </output>
+      {showCampaign && (
+        <CampaignOfferCard
+          offer={campaignOffer}
+          onOpen={(_offer, nextTrigger) => {
+            setTrigger(nextTrigger);
+            setOpen(true);
+          }}
+        />
+      )}
       <CampaignOfferDialog
         offer={campaignOffer}
         open={open}
         trigger={trigger}
+        focusFallback={focusFallback.current}
         onOpenChange={setOpen}
       />
     </>
@@ -104,13 +111,21 @@ function renderWithAuth(ui: React.ReactNode) {
     },
   });
 
-  return render(
+  const tree = (content: React.ReactNode) => (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <AuthDialogProvider>{ui}</AuthDialogProvider>
+        <AuthDialogProvider>{content}</AuthDialogProvider>
       </QueryClientProvider>
-    </BrowserRouter>,
+    </BrowserRouter>
   );
+  const view = render(tree(ui));
+
+  return {
+    ...view,
+    rerenderWithAuth(content: React.ReactNode) {
+      view.rerender(tree(content));
+    },
+  };
 }
 
 describe('dialog-to-auth handoff', () => {
@@ -171,5 +186,26 @@ describe('dialog-to-auth handoff', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(card).toHaveFocus());
+  });
+
+  it('returns auth focus to the catalog when the campaign trigger detaches before handoff', async () => {
+    const user = userEvent.setup();
+    const view = renderWithAuth(<CampaignHarness />);
+
+    const card = screen.getByRole('button', { name: /Weekend Reward.*view details/ });
+    await user.click(card);
+    view.rerenderWithAuth(<CampaignHarness showCampaign={false} />);
+    expect(card.isConnected).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'sign in to claim' }));
+
+    const email = await screen.findByRole('textbox', { name: 'email' });
+    expect(screen.queryByRole('dialog', { name: 'Weekend Reward' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await waitFor(() => expect(email).toHaveFocus());
+
+    const fallback = screen.getByText('0 offers found');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(fallback).toHaveFocus());
   });
 });
