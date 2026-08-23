@@ -40,40 +40,29 @@ Leave `CORS_ORIGIN` empty on Vercel because the frontend and API share the same 
 
 ## 3. Seed Demo Data
 
-After adding `MONGODB_URI` locally, run:
+After adding `MONGODB_URI` locally, choose a local-only demo password without placing it in shell history:
 
-```sh
+```bash
+read -rsp "Demo password: " DEMO_PASSWORD
+export DEMO_PASSWORD
 npm run seed:demo
+unset DEMO_PASSWORD
 ```
 
-Optional custom demo password:
-
-```sh
-DEMO_PASSWORD="your-password" npm run seed:demo
-```
-
-Demo login:
-
-```text
-Customer email: demo@vouchit.app
-Business email: business@vouchit.app
-Default password: DemoPass123!
-```
-
-The seed script is idempotent. Run it again before recruiter calls to restore sample customer data, the business profile, paid campaign invoices, claimed and remaining campaign vouchers, observed views, and expired campaign evidence. Set `DEMO_PASSWORD` to use another password; the seed does not print passwords.
+Keep `DEMO_PASSWORD` out of committed files and shell history. The seed script is idempotent and requires this caller-provided value; it does not print account identifiers or passwords. Run it again before recruiter calls to restore sample customer data, the business profile, paid campaign invoices, one active grouped campaign offer with one prior claim and two remaining codes, observed views, and expired campaign evidence.
 
 ## 4. Recruiter Demo Flow
 
 1. Open the Vercel URL.
-2. Browse community and business campaign vouchers without logging in.
-3. Log in as `demo@vouchit.app` to show the customer role, favorite a voucher, and claim an available voucher.
+2. Browse the available-only catalog without logging in. Show server-side search, platform/category/source and expiring-soon filters, expiry-first ordering, individual community vouchers, and the grouped campaign offer with its remaining count.
+3. Sign in with a seeded customer identity and the locally selected password to show the customer role, favorite a community voucher, and redeem it through the community-only flow.
 4. Open Community to show requests, leaderboard, activity, comments, and customer history.
-5. Log out and log in as `business@vouchit.app` to show the business role and campaign workspace.
+5. Sign in with the seeded business identity and the locally selected password to show the business role and campaign workspace.
 6. Create or open a campaign draft, enter campaign details and expiry, then upload a CSV inventory.
 7. Review Papa Parse accepted rows and rejected rows, confirm the accepted inventory, and issue the invoice.
 8. Record matching external or offline settlement evidence. VouchIt records the evidence; it does not process the payment.
-9. Return to the public browse view to show the settlement-gated campaign vouchers, then claim one as the customer.
-10. Return to the business workspace to show the paid invoice, active campaign, claimed/remaining inventory, observed views, and claims. The seeded expired campaign provides completed-history evidence.
+9. Return to the catalog to show that settlement-gated inventory appears as one coherent grouped campaign offer with remaining inventory. A seeded customer without a prior claim can claim one assigned code; the same customer cannot claim another code from that campaign.
+10. Return to the business workspace to show the paid invoice, active campaign, claimed and remaining inventory, observed views, and claims. The seeded expired campaign provides completed-history evidence.
 
 ## 5. Free-Tier Notes
 

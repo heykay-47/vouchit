@@ -1,6 +1,6 @@
 # VouchIt
 
-A voucher sharing platform where customers can donate and claim digital vouchers, and businesses can publish campaign inventory for customers to use before expiry.
+A voucher sharing platform where customers discover and claim available community vouchers or grouped business campaign offers before expiry.
 
 ## Quick Start
 
@@ -44,9 +44,9 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 
 VouchIt supports both sides of the marketplace without claiming that a payment processor or fulfillment network is built in:
 
-- **Customers** browse community and business campaign vouchers, claim vouchers they can use, and can donate, favorite, comment on, report, and request vouchers when signed in as customers.
+- **Customers** use server-side search, platform/category/source filters, and an expiring-soon filter over available offers ordered by expiry. Community vouchers stay individual; each active business campaign appears once with its remaining inventory, and a customer can claim at most one code from that campaign.
 - **Businesses** create a campaign draft, validate and confirm CSV inventory, receive a paise-denominated invoice, and record external or offline settlement evidence. Settlement is recorded by VouchIt; it is not processed by VouchIt.
-- **Publishing** is settlement-gated. Paid campaigns expose active inventory, and the business workspace shows observed voucher views and claims when analytics exist.
+- **Publishing** is settlement-gated. Paid campaign inventory becomes one coherent discoverable offer with a remaining-code count, while the business workspace shows observed voucher views and claims when analytics exist.
 - **Pricing** is `₹99 + ₹2 per confirmed campaign voucher`, represented internally as `9900 + 200 * quantity` paise.
 
 ## API Endpoints
@@ -59,15 +59,22 @@ VouchIt supports both sides of the marketplace without claiming that a payment p
 | POST | `/api/auth/logout` | No | Clear session cookie |
 | GET | `/api/auth/me` | Yes | Get current user with favorites & redemptions |
 
-### Vouchers
+### Offers
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/vouchers` | No | List active vouchers |
-| POST | `/api/vouchers` | Yes | Donate a new voucher |
-| POST | `/api/vouchers/:id/redeem` | Yes | Redeem a voucher |
-| POST | `/api/vouchers/:id/report` | Yes | Report broken voucher |
+| GET | `/api/offers` | No | Search and filter available community vouchers and grouped campaign offers in expiry-first order |
+| POST | `/api/offers/campaign/:campaignId/claim` | Customer | Claim one remaining campaign code, limited to one code per customer per campaign |
+| POST | `/api/offers/campaign/:campaignId/view` | No | Record a best-effort view against eligible grouped campaign inventory |
+
+### Vouchers And Community Actions
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/vouchers` | Optional | List voucher records and signed-in customer history; use `/api/offers` for grouped discovery |
+| POST | `/api/vouchers` | Customer | Donate a new community voucher |
+| POST | `/api/vouchers/:id/redeem` | Customer | Redeem a community voucher |
+| POST | `/api/vouchers/:id/report` | Customer | Report a broken voucher |
 | GET | `/api/vouchers/:id/comments` | No | Get comments for a voucher |
-| POST | `/api/vouchers/:id/comments` | Yes | Add a comment |
+| POST | `/api/vouchers/:id/comments` | Customer | Add a comment |
 
 ### Users
 | Method | Path | Auth | Description |

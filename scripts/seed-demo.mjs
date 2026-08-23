@@ -270,7 +270,7 @@ export const buildDemoFixtures = (now = new Date()) => {
     comments: [{
       voucherCode: 'GPLAY20-DEMO',
       userKey: 'customer-user',
-      text: 'Verified during demo setup. This one is safe to redeem live.',
+      text: 'Seeded discussion for demonstrating the community comment flow.',
     }],
     notifications: [{
       userKey: 'customer-user',
@@ -370,6 +370,7 @@ const campaignSchema = new mongoose.Schema({
 }, { timestamps: true });
 campaignSchema.index({ businessId: 1 });
 campaignSchema.index({ status: 1 });
+campaignSchema.index({ status: 1, expiryDate: 1, _id: 1 });
 
 const invoiceSchema = new mongoose.Schema({
   campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', required: true },
@@ -424,6 +425,9 @@ voucherSchema.index(
   { campaignId: 1, code: 1 },
   { unique: true, partialFilterExpression: { sourceType: 'campaign' } },
 );
+voucherSchema.index({ sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });
+voucherSchema.index({ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });
+voucherSchema.index({ campaignId: 1, redeemedBy: 1 });
 
 const voucherRequestSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -528,13 +532,15 @@ const run = async () => {
   if (!process.env.MONGODB_URI) {
     throw new Error('MONGODB_URI is required');
   }
+  if (!process.env.DEMO_PASSWORD) {
+    throw new Error('DEMO_PASSWORD is required');
+  }
 
   await mongoose.connect(process.env.MONGODB_URI, { bufferCommands: false });
 
   const now = new Date();
   const fixtures = buildDemoFixtures(now);
-  const password = process.env.DEMO_PASSWORD || 'DemoPass123!';
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(process.env.DEMO_PASSWORD, 12);
   const users = {};
   const vouchers = {};
   const campaigns = {};
@@ -768,8 +774,6 @@ const run = async () => {
   }
 
   console.log('Demo seed complete');
-  console.log('Customer login: demo@vouchit.app');
-  console.log('Business login: business@vouchit.app');
 };
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

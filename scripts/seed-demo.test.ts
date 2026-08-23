@@ -38,6 +38,17 @@ describe('demo seed fixtures', () => {
     ))).toBe(true);
   });
 
+  it('provides one active grouped campaign with multiple remaining codes', () => {
+    const fixtures = buildDemoFixtures(fixedNow);
+    const active = fixtures.campaigns.find((campaign) => campaign.status === 'active');
+    const inventory = fixtures.vouchers.filter((voucher) => voucher.campaignKey === active?.seedKey);
+
+    expect(fixtures.campaigns.filter((campaign) => campaign.status === 'active')).toHaveLength(1);
+    expect(inventory.filter((voucher) => !voucher.isRedeemed)).toHaveLength(2);
+    expect(inventory.filter((voucher) => voucher.isRedeemed)).toHaveLength(1);
+    expect(new Set(inventory.map((voucher) => voucher.redeemedByKey).filter(Boolean)).size).toBe(1);
+  });
+
   it('includes expired campaign outcome evidence', () => {
     const fixtures = buildDemoFixtures(fixedNow);
     const expired = fixtures.campaigns.find((campaign) => campaign.status === 'completed');
@@ -98,10 +109,39 @@ describe('demo seed fixtures', () => {
     ))).size).toBe(redeemedCampaigns.length);
   });
 
-  it('keeps the duplicate seed redemption schema campaign-aware', () => {
+  it('mirrors the runtime offer discovery and campaign claim indexes', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/seed-demo.mjs'), 'utf8');
 
+    expect(source).toContain('campaignSchema.index({ status: 1, expiryDate: 1, _id: 1 });');
+    expect(source).toContain('voucherSchema.index({ sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });');
+    expect(source).toContain('voucherSchema.index({ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });');
+    expect(source).toContain('voucherSchema.index({ campaignId: 1, redeemedBy: 1 });');
     expect(source).toContain("campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', default: null }");
     expect(source).toContain("partialFilterExpression: { campaignId: { $type: 'objectId' } }");
+  });
+
+  it('documents grouped offer discovery and its claim boundary', () => {
+    const readme = readFileSync(resolve(process.cwd(), 'README.md'), 'utf8');
+    const product = readFileSync(resolve(process.cwd(), 'PRODUCT.md'), 'utf8');
+    const changelog = readFileSync(resolve(process.cwd(), 'CHANGELOG.md'), 'utf8');
+    const deployment = readFileSync(resolve(process.cwd(), 'DEMO_DEPLOYMENT.md'), 'utf8');
+
+    expect(readme).toContain('| GET | `/api/offers` | No |');
+    expect(readme).toContain('| POST | `/api/offers/campaign/:campaignId/claim` | Customer |');
+    expect(readme).toContain('| POST | `/api/offers/campaign/:campaignId/view` | No |');
+    expect(readme).toContain('| POST | `/api/vouchers/:id/redeem` | Customer | Redeem a community voucher |');
+    expect(product).toContain('server-side search');
+    expect(product).toContain('one campaign code per customer');
+    expect(product).toContain('remaining inventory');
+    expect(changelog).toContain('server-side offer discovery');
+    expect(deployment).toContain('grouped campaign offer');
+  });
+
+  it('requires a caller-provided password without printing demo credentials', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/seed-demo.mjs'), 'utf8');
+
+    expect(source).toContain("throw new Error('DEMO_PASSWORD is required')");
+    expect(source).not.toMatch(/process\.env\.DEMO_PASSWORD\s*\|\|/);
+    expect(source).not.toMatch(/console\.log\('(Customer|Business) login:/);
   });
 });
