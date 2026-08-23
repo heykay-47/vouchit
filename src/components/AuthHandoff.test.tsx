@@ -1,15 +1,22 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
-import type { Voucher } from '@/lib/types';
+import type { CampaignOffer, Voucher } from '@/lib/types';
 import { AuthDialogProvider } from '@/contexts/AuthDialogContext';
+import { CampaignOfferCard, CampaignOfferDialog } from './CampaignOfferCard';
 import Sidebar from './Sidebar';
 import VoucherCard from './VoucherCard';
 
 const redeemVoucher = vi.fn();
 const reportVoucher = vi.fn();
 const retryVouchers = vi.fn();
+const campaignService = vi.hoisted(() => ({
+  claimCampaign: vi.fn(),
+  recordCampaignView: vi.fn(),
+}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -24,6 +31,13 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/contexts/VoucherContext', () => ({
   useVouchers: () => ({ redeemVoucher, reportVoucher, retryVouchers }),
+}));
+
+vi.mock('@/services/offer.service', () => ({
+  offerService: {
+    claimCampaign: campaignService.claimCampaign,
+    recordCampaignView: campaignService.recordCampaignView,
+  },
 }));
 
 vi.mock('next-themes', () => ({
@@ -44,10 +58,57 @@ const voucher: Voucher = {
   isActive: true,
 };
 
+const campaignOffer: CampaignOffer = {
+  kind: 'campaign',
+  id: 'campaign-1',
+  title: 'Weekend Reward',
+  description: 'Use this weekend',
+  terms: 'One use per customer',
+  platform: 'Google Pay',
+  category: 'Shopping',
+  imageUrl: 'https://example.com/campaign.png',
+  expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+  brandName: 'Fresh Rewards',
+  organizationName: 'Fresh Market Ltd',
+  remainingCount: 3,
+};
+
+function CampaignHarness() {
+  const [open, setOpen] = useState(false);
+  const [trigger, setTrigger] = useState<HTMLButtonElement | null>(null);
+
+  return (
+    <>
+      <CampaignOfferCard
+        offer={campaignOffer}
+        onOpen={(_offer, nextTrigger) => {
+          setTrigger(nextTrigger);
+          setOpen(true);
+        }}
+      />
+      <CampaignOfferDialog
+        offer={campaignOffer}
+        open={open}
+        trigger={trigger}
+        onOpenChange={setOpen}
+      />
+    </>
+  );
+}
+
 function renderWithAuth(ui: React.ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      mutations: { retry: false },
+      queries: { retry: false },
+    },
+  });
+
   return render(
     <BrowserRouter>
-      <AuthDialogProvider>{ui}</AuthDialogProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthDialogProvider>{ui}</AuthDialogProvider>
+      </QueryClientProvider>
     </BrowserRouter>,
   );
 }
@@ -55,6 +116,7 @@ function renderWithAuth(ui: React.ReactNode) {
 describe('dialog-to-auth handoff', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    campaignService.recordCampaignView.mockResolvedValue({ recorded: true });
     window.matchMedia = vi.fn().mockReturnValue({
       matches: false,
       addEventListener: vi.fn(),
@@ -88,6 +150,23 @@ describe('dialog-to-auth handoff', () => {
 
     const email = await screen.findByRole('textbox', { name: 'email' });
     expect(screen.queryByText('sign in to view details')).not.toBeInTheDocument();
+    await waitFor(() => expect(email).toHaveFocus());
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(card).toHaveFocus());
+  });
+
+  it('waits for campaign details to close, focuses shared auth, then returns to the campaign card', async () => {
+    const user = userEvent.setup();
+    renderWithAuth(<CampaignHarness />);
+
+    const card = screen.getByRole('button', { name: /Weekend Reward.*view details/ });
+    await user.click(card);
+    await user.click(screen.getByRole('button', { name: 'sign in to claim' }));
+
+    const email = await screen.findByRole('textbox', { name: 'email' });
+    expect(screen.queryByRole('dialog', { name: 'Weekend Reward' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
     await waitFor(() => expect(email).toHaveFocus());
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
