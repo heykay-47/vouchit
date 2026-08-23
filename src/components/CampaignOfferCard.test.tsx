@@ -133,31 +133,35 @@ function renderCampaignDialog({
   offer?: CampaignOffer;
   queryClient?: QueryClient;
 }) {
-  mocks.useAuth.mockReturnValue({
-    isAuthenticated: user !== null,
-    user,
-  });
+  let currentOffer = offer;
+  let currentUser = user;
+  mocks.useAuth.mockImplementation(() => ({
+    isAuthenticated: currentUser !== null,
+    user: currentUser,
+  }));
   const trigger = document.createElement('button');
   trigger.type = 'button';
   trigger.textContent = 'campaign card trigger';
   document.body.append(trigger);
 
-  const view = render(
+  const dialog = () => (
     <QueryClientProvider client={queryClient}>
-      <DialogHarness offer={offer} trigger={trigger} />
-    </QueryClientProvider>,
+      <DialogHarness offer={currentOffer} trigger={trigger} />
+    </QueryClientProvider>
   );
+  const view = render(dialog());
 
   return {
     ...view,
     queryClient,
     trigger,
     rerenderOffer(nextOffer: CampaignOffer) {
-      view.rerender(
-        <QueryClientProvider client={queryClient}>
-          <DialogHarness offer={nextOffer} trigger={trigger} />
-        </QueryClientProvider>,
-      );
+      currentOffer = nextOffer;
+      view.rerender(dialog());
+    },
+    rerenderUser(nextUser: User | null) {
+      currentUser = nextUser;
+      view.rerender(dialog());
     },
   };
 }
@@ -188,7 +192,7 @@ describe('CampaignOfferCard', () => {
     render(<CampaignOfferCard offer={campaignOffer} onOpen={openDialog} />);
 
     const trigger = screen.getByRole('button', {
-      name: /Weekend Reward.*Google Pay.*Shopping.*business campaign.*Fresh Market Ltd.*Fresh Rewards.*3 available.*view details/i,
+      name: /business campaign.*Fresh Market Ltd.*Fresh Rewards.*3 available.*Weekend Reward.*Google Pay.*Shopping.*Use this weekend.*expires Sep 1.*view details/i,
     });
     expect(trigger).toHaveTextContent('business campaign');
     expect(trigger).toHaveTextContent('Google Pay');
@@ -262,10 +266,43 @@ describe('CampaignOfferCard', () => {
 
     await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
 
-    expect(await screen.findByText('ASSIGNED-CODE')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'copy assigned code' })).toBeEnabled();
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('campaign voucher claimed, assigned code ASSIGNED-CODE');
+    const copy = screen.getByRole('button', { name: 'copy assigned code ASSIGNED-CODE' });
+    expect(copy).toBeEnabled();
+    expect(copy).toHaveFocus();
     expect(mocks.claimCampaign.mock.calls[0]?.[0]).toBe(campaignOffer.id);
     refresh.resolve();
+  });
+
+  it.each([
+    ['logout', null],
+    ['account switch', { ...customer, id: 'customer-2', email: 'other@example.com' }],
+  ] as const)('clears an assigned code after a viewer %s', async (_label, nextUser) => {
+    const user = userEvent.setup();
+    const view = renderCampaignDialog({ user: customer });
+    await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
+    expect(await screen.findByText('ASSIGNED-CODE')).toBeInTheDocument();
+
+    view.rerenderUser(nextUser);
+
+    await waitFor(() => expect(screen.queryByText('ASSIGNED-CODE')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', {
+      name: nextUser ? 'claim from campaign' : 'sign in to claim',
+    })).toBeEnabled();
+  });
+
+  it('clears a claim conflict after a viewer change', async () => {
+    const user = userEvent.setup();
+    mocks.claimCampaign.mockRejectedValue(new ApiClientError('conflict', 409));
+    const view = renderCampaignDialog({ user: customer });
+    await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('already claimed');
+
+    view.rerenderUser({ ...customer, id: 'customer-2', email: 'other@example.com' });
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'claim from campaign' })).toBeEnabled();
   });
 
   it('resets an assigned code only after close or selecting a different campaign', async () => {
@@ -288,6 +325,7 @@ describe('CampaignOfferCard', () => {
     await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
     expect(await screen.findByText('ASSIGNED-CODE')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(view.trigger).toHaveFocus());
     await user.click(screen.getByRole('button', { name: 'reopen campaign details' }));
     expect(screen.queryByText('ASSIGNED-CODE')).not.toBeInTheDocument();
   });
@@ -331,7 +369,7 @@ describe('CampaignOfferCard', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } });
     renderCampaignDialog({ user: customer });
     await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
-    const copy = await screen.findByRole('button', { name: 'copy assigned code' });
+    const copy = await screen.findByRole('button', { name: 'copy assigned code ASSIGNED-CODE' });
 
     await user.click(copy);
     expect(writeText).toHaveBeenCalledWith('ASSIGNED-CODE');

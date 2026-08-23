@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
+import { useOffersQuery } from '@/hooks/useOffersQuery';
 import type {
   CampaignOffer,
   CommunityOffer,
@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   recordCampaignView: vi.fn(),
   useAuth: vi.fn(),
   useOffersQuery: vi.fn(),
+  useVouchers: vi.fn(),
 }));
 
 vi.mock('@/hooks/useOffersQuery', async (importOriginal) => {
@@ -42,20 +43,13 @@ vi.mock('@/contexts/AuthDialogContext', () => ({
 }));
 
 vi.mock('@/contexts/VoucherContext', () => ({
-  useVouchers: () => ({ vouchers: [], isLoading: false }),
+  useVouchers: mocks.useVouchers,
 }));
 
 vi.mock('@/components/VoucherCard', () => ({
-  default: ({
-    voucher,
-    onRedeemSuccess,
-  }: {
-    voucher: Voucher;
-    onRedeemSuccess?: () => void;
-  }) => (
+  default: ({ voucher }: { voucher: Voucher }) => (
     <article>
       <p>{voucher.title}</p>
-      <button type="button" onClick={onRedeemSuccess}>redeem community offer</button>
     </article>
   ),
 }));
@@ -169,6 +163,7 @@ describe('Browse', () => {
     });
     mocks.recordCampaignView.mockResolvedValue({ recorded: true });
     mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: customer });
+    mocks.useVouchers.mockReturnValue({ vouchers: [], isLoading: false });
     queryClient = new QueryClient({
       defaultOptions: {
         mutations: { retry: false },
@@ -196,7 +191,7 @@ describe('Browse', () => {
 
     renderBrowse('/browse?q=reward&platform=Google+Pay&category=Shopping&source=campaign&expiring=true');
 
-    expect(screen.getByText('2 offers found')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('2 offers found');
     expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Weekend Reward.*view details/i })).toBeInTheDocument();
     expect(useOffersQuery).toHaveBeenCalledWith({
@@ -246,6 +241,20 @@ describe('Browse', () => {
     );
   });
 
+  it('discovers offers without reading private voucher history', () => {
+    setQuery({
+      data: {
+        pages: [{ offers: [communityOffer], total: 1, nextCursor: null, hasMore: false }],
+        pageParams: [null],
+      },
+    });
+
+    renderBrowse();
+
+    expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
+    expect(mocks.useVouchers).not.toHaveBeenCalled();
+  });
+
   it('de-duplicates appended pages by kind and id without hiding cross-kind ids', () => {
     const crossKindCampaign = {
       ...campaignOffer,
@@ -284,7 +293,7 @@ describe('Browse', () => {
 
     renderBrowse();
 
-    expect(screen.getByText('loading...')).toBeInTheDocument();
+    expect(screen.getByText('loading...')).toHaveAttribute('role', 'status');
     expect(screen.queryByText('no offers are available right now')).not.toBeInTheDocument();
   });
 
@@ -293,6 +302,9 @@ describe('Browse', () => {
     setQuery({ isError: true, data: undefined });
     renderBrowse();
 
+    expect(screen.getByRole('alert')).toContainElement(
+      screen.getByRole('button', { name: 'retry loading offers' }),
+    );
     await user.click(screen.getByRole('button', { name: 'retry loading offers' }));
 
     expect(refetch).toHaveBeenCalledOnce();
@@ -317,6 +329,9 @@ describe('Browse', () => {
     renderBrowse();
 
     expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toContainElement(
+      screen.getByRole('button', { name: 'retry loading more offers' }),
+    );
     await user.click(screen.getByRole('button', { name: 'retry loading more offers' }));
 
     expect(fetchNextPage).toHaveBeenCalledOnce();
@@ -341,7 +356,9 @@ describe('Browse', () => {
     renderBrowse();
 
     expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'loading more...' })).toBeDisabled();
+    const loadingMore = screen.getByRole('button', { name: 'loading more...' });
+    expect(loadingMore).toBeDisabled();
+    expect(loadingMore.closest('[role="status"]')).not.toBeNull();
   });
 
   it('loads the next page from the active pagination control', async () => {
@@ -375,7 +392,7 @@ describe('Browse', () => {
     });
     const view = renderBrowse();
 
-    expect(screen.getByText('no offers are available right now')).toBeInTheDocument();
+    expect(screen.getByText('no offers are available right now')).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('button', { name: 'clear filters' })).not.toBeInTheDocument();
 
     view.unmount();
@@ -388,27 +405,6 @@ describe('Browse', () => {
       source: 'all',
       expiringSoon: false,
     }));
-  });
-
-  it('invalidates server offers after a community redemption succeeds', async () => {
-    const user = userEvent.setup();
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
-    setQuery({
-      data: {
-        pages: [{
-          offers: [communityOffer],
-          total: 1,
-          nextCursor: null,
-          hasMore: false,
-        }],
-        pageParams: [null],
-      },
-    });
-    renderBrowse();
-
-    await user.click(screen.getByRole('button', { name: 'redeem community offer' }));
-
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: offersQueryKey });
   });
 
   it('keeps claim success mounted after the campaign leaves the grid', async () => {
@@ -439,5 +435,10 @@ describe('Browse', () => {
 
     expect(screen.queryByRole('button', { name: /Weekend Reward.*view details/i })).not.toBeInTheDocument();
     expect(screen.getByText('ASSIGNED-CODE')).toBeInTheDocument();
+
+    const fallback = screen.getByText('0 offers found');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(fallback).toHaveFocus());
   });
 });

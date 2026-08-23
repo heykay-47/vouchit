@@ -32,7 +32,6 @@ export function CampaignOfferCard({
   return (
     <button
       type="button"
-      aria-label={`${offer.title}, ${offer.platform}, ${offer.category}, business campaign, ${offer.organizationName}, ${offer.brandName}, ${offer.remainingCount} available, view details`}
       className="min-h-[156px] w-full rounded-lg border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 active:bg-muted/60"
       onClick={(event) => onOpen(offer, event.currentTarget)}
     >
@@ -58,6 +57,7 @@ export function CampaignOfferCard({
       <p className="text-xs text-muted-foreground">
         expires {offer.expiryDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
       </p>
+      <span className="sr-only">view details</span>
     </button>
   );
 }
@@ -66,11 +66,13 @@ export function CampaignOfferDialog({
   offer,
   open,
   trigger,
+  focusFallback,
   onOpenChange,
 }: {
   offer: CampaignOffer;
   open: boolean;
   trigger: HTMLButtonElement | null;
+  focusFallback?: HTMLElement | null;
   onOpenChange: (open: boolean) => void;
 }) {
   const { isAuthenticated, user } = useAuth();
@@ -79,17 +81,31 @@ export function CampaignOfferDialog({
   const resetClaim = claim.reset;
   const [claimConflict, setClaimConflict] = useState(false);
   const [pendingAuthHandoff, setPendingAuthHandoff] = useState(false);
-  const previousOfferId = useRef<string | null>(null);
+  const claimContext = useRef<{ offerId: string; viewerKey: string } | null>(null);
+  const copyCodeRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
   const descriptionId = useId();
   const termsId = useId();
+  const viewerKey = user?.id ?? 'anonymous';
+  const claimBelongsToViewer = claimContext.current?.offerId === offer.id
+    && claimContext.current.viewerKey === viewerKey;
+  const assignedCode = claimBelongsToViewer
+    && user?.id === claim.data?.voucher.redeemedBy
+    ? claim.data.voucher.code
+    : undefined;
+  const hasClaimConflict = claimBelongsToViewer && claimConflict;
+  const isClaimPending = claimBelongsToViewer && claim.isPending;
+  const hasClaimError = claimBelongsToViewer && claim.isError;
 
   useEffect(() => {
-    if (offer.id === previousOfferId.current) return;
-    previousOfferId.current = offer.id;
+    claimContext.current = null;
     resetClaim();
     setClaimConflict(false);
-  }, [offer.id, resetClaim]);
+  }, [offer.id, resetClaim, viewerKey]);
+
+  useEffect(() => {
+    if (assignedCode) copyCodeRef.current?.focus();
+  }, [assignedCode]);
 
   useEffect(() => {
     const opened = open && !wasOpen.current;
@@ -103,6 +119,7 @@ export function CampaignOfferDialog({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      claimContext.current = null;
       resetClaim();
       setClaimConflict(false);
     }
@@ -117,10 +134,13 @@ export function CampaignOfferDialog({
     }
     if (user?.role !== 'customer') return;
 
+    const currentClaimContext = { offerId: offer.id, viewerKey };
+    claimContext.current = currentClaimContext;
     try {
       setClaimConflict(false);
       await claim.mutateAsync(offer.id);
     } catch (error) {
+      if (claimContext.current !== currentClaimContext) return;
       if (error instanceof ApiClientError && error.status === 409) {
         setClaimConflict(true);
         return;
@@ -129,8 +149,6 @@ export function CampaignOfferDialog({
       logger.error('Error claiming campaign voucher', error, { campaignId: offer.id });
     }
   };
-
-  const assignedCode = claim.data?.voucher.code;
 
   const copyAssignedCode = async () => {
     if (!assignedCode) return;
@@ -163,6 +181,11 @@ export function CampaignOfferDialog({
           if (trigger?.isConnected) {
             event.preventDefault();
             trigger.focus();
+            return;
+          }
+          if (focusFallback?.isConnected) {
+            event.preventDefault();
+            focusFallback.focus();
           }
         }}
       >
@@ -210,9 +233,13 @@ export function CampaignOfferDialog({
           {assignedCode && (
             <div className="rounded-lg bg-muted p-3">
               <p className="mb-2 text-xs text-muted-foreground lowercase">assigned code</p>
+              <p role="status" className="sr-only">
+                campaign voucher claimed, assigned code {assignedCode}
+              </p>
               <button
+                ref={copyCodeRef}
                 type="button"
-                aria-label="copy assigned code"
+                aria-label={`copy assigned code ${assignedCode}`}
                 className="min-h-11 w-full break-all rounded bg-background px-3 py-2 text-left font-mono text-sm transition-colors hover:bg-background/80"
                 onClick={copyAssignedCode}
               >
@@ -222,19 +249,19 @@ export function CampaignOfferDialog({
             </div>
           )}
 
-          {claimConflict && (
+          {hasClaimConflict && (
             <p role="alert" className="text-center text-sm text-muted-foreground lowercase">
               this campaign is already claimed or no longer available
             </p>
           )}
 
-          {claim.isError && !claimConflict && (
+          {hasClaimError && !hasClaimConflict && (
             <p role="alert" className="text-center text-sm text-muted-foreground lowercase">
               failed to claim campaign voucher, please try again
             </p>
           )}
 
-          {!assignedCode && !claimConflict && (
+          {!assignedCode && !hasClaimConflict && (
             <div className="pt-2">
               {!isAuthenticated && (
                 <Button className="min-h-11 w-full text-black lowercase" onClick={handleClaim}>
@@ -245,10 +272,10 @@ export function CampaignOfferDialog({
               {isAuthenticated && user?.role === 'customer' && (
                 <Button
                   className="min-h-11 w-full text-black lowercase"
-                  disabled={claim.isPending}
+                  disabled={isClaimPending}
                   onClick={handleClaim}
                 >
-                  {claim.isPending ? 'claiming from campaign…' : 'claim from campaign'}
+                  {isClaimPending ? 'claiming from campaign…' : 'claim from campaign'}
                 </Button>
               )}
 

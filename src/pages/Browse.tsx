@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   useLocation,
   useNavigationType,
@@ -15,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import VoucherCard from '@/components/VoucherCard';
 import {
   flattenOfferPages,
-  offersQueryKey,
   useOffersQuery,
 } from '@/hooks/useOffersQuery';
 import {
@@ -36,7 +34,7 @@ export default function Browse() {
     trigger: HTMLButtonElement;
   } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const resultsStatusRef = useRef<HTMLParagraphElement>(null);
   const filters = parseOfferFilters(searchParams);
   const query = useOffersQuery(filters);
   const offers = flattenOfferPages(query.data?.pages ?? []);
@@ -66,15 +64,20 @@ export default function Browse() {
     setDialogOpen(true);
   };
 
-  const refreshOffers = () => {
-    void queryClient.invalidateQueries({ queryKey: offersQueryKey });
-  };
-
   return (
     <div className="py-4">
       <header className="mb-8">
         <h1 className="mb-2 text-2xl font-medium lowercase">browse vouchers</h1>
-        <p className="text-sm text-muted-foreground">{total} offers found</p>
+        <p
+          ref={resultsStatusRef}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          tabIndex={-1}
+          className="text-sm text-muted-foreground"
+        >
+          {total} offers found
+        </p>
       </header>
 
       <div className="mb-8">
@@ -87,12 +90,12 @@ export default function Browse() {
 
       {query.isPending && (
         <div className="py-16 text-center">
-          <p className="text-muted-foreground">loading...</p>
+          <p role="status" className="text-muted-foreground">loading...</p>
         </div>
       )}
 
       {firstPageError && (
-        <div className="py-16 text-center">
+        <div role="alert" className="py-16 text-center">
           <Button type="button" className="min-h-11 lowercase" onClick={() => query.refetch()}>
             retry loading offers
           </Button>
@@ -106,7 +109,6 @@ export default function Browse() {
               <VoucherCard
                 key={`${offer.kind}:${offer.id}`}
                 voucher={offer}
-                onRedeemSuccess={refreshOffers}
               />
             ) : (
               <CampaignOfferCard
@@ -121,7 +123,7 @@ export default function Browse() {
 
       {!query.isPending && !firstPageError && total === 0 && (
         <div className="py-16 text-center">
-          <p className="text-muted-foreground">
+          <p role="status" className="text-muted-foreground">
             {hasActiveOfferFilters(filters)
               ? 'no offers match these filters'
               : 'no offers are available right now'}
@@ -130,7 +132,7 @@ export default function Browse() {
       )}
 
       {query.isFetchNextPageError && (
-        <div className="pt-8 text-center">
+        <div role="alert" className="pt-8 text-center">
           <Button
             type="button"
             variant="outline"
@@ -143,7 +145,12 @@ export default function Browse() {
       )}
 
       {query.hasNextPage && !query.isFetchNextPageError && (
-        <div className="pt-8 text-center">
+        <div
+          role={query.isFetchingNextPage ? 'status' : undefined}
+          aria-live="polite"
+          aria-atomic="true"
+          className="pt-8 text-center"
+        >
           <Button
             type="button"
             variant="outline"
@@ -161,6 +168,7 @@ export default function Browse() {
           offer={selected.offer}
           open={dialogOpen}
           trigger={selected.trigger}
+          focusFallback={resultsStatusRef.current}
           onOpenChange={setDialogOpen}
         />
       )}
