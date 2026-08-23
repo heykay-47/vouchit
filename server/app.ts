@@ -7,6 +7,7 @@ import { communityRouter } from './routes/community.js';
 import { usersRouter } from './routes/users.js';
 import { vouchersRouter } from './routes/vouchers.js';
 import { businessRouter } from './routes/business.js';
+import { offersRouter } from './routes/offers.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { fail, ok } from './lib/http.js';
 
@@ -47,9 +48,12 @@ export const createApp = () => {
   app.use('/api/users', writeLimiter);
   app.use('/api/requests', writeLimiter);
   app.use('/api/business', writeLimiter);
+  app.use('/api/offers/campaign/:campaignId/claim', writeLimiter);
+  app.use('/api/offers/campaign/:campaignId/view', writeLimiter);
 
   app.use('/api/auth', authRouter);
   app.use('/api/vouchers', vouchersRouter);
+  app.use('/api/offers', offersRouter);
   app.use('/api/users', usersRouter);
   app.use('/api', communityRouter);
   app.use('/api/business', businessRouter);

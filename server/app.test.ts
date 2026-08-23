@@ -48,6 +48,14 @@ describe('createApp', () => {
     expect(res.headers['ratelimit-remaining']).toBeDefined();
   });
 
+  it('leaves offer reads outside the write limiter and limits offer claims', async () => {
+    const read = await request(createApp()).get('/api/offers?limit=0');
+    const write = await request(createApp()).post('/api/offers/campaign/not-an-id/claim');
+
+    expect(read.headers['ratelimit-remaining']).toBeUndefined();
+    expect(write.headers['ratelimit-remaining']).toBeDefined();
+  });
+
   it('maps oversized JSON bodies to a safe 413 envelope', async () => {
     const res = await request(createApp())
       .post('/api/business/campaigns')

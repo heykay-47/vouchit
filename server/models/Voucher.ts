@@ -72,6 +72,9 @@ voucherSchema.index(
   { campaignId: 1, code: 1 },
   { unique: true, partialFilterExpression: { sourceType: 'campaign' } },
 );
+voucherSchema.index({ sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });
+voucherSchema.index({ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });
+voucherSchema.index({ campaignId: 1, redeemedBy: 1 });
 
 export type VoucherDocument = InferSchemaType<typeof voucherSchema> & { _id: mongoose.Types.ObjectId };
 export const Voucher: mongoose.Model<any> =

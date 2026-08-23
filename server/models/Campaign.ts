@@ -32,6 +32,7 @@ const campaignSchema = new Schema(
 
 campaignSchema.index({ businessId: 1 });
 campaignSchema.index({ status: 1 });
+campaignSchema.index({ status: 1, expiryDate: 1, _id: 1 });
 
 export type CampaignDocument = InferSchemaType<typeof campaignSchema> & { _id: mongoose.Types.ObjectId };
 export const Campaign: mongoose.Model<CampaignDocument> =

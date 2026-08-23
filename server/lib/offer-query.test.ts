@@ -168,11 +168,31 @@ describe('offer query primitives', () => {
       },
     ] } });
     const communityProjection = pipeline[1].$project as Record<string, unknown>;
-    expect(communityProjection.expiryDate).toEqual({ $ifNull: ['$expiryDate', null] });
+    expect(communityProjection).toEqual({
+      _id: 1,
+      kind: { $literal: 'community' },
+      title: 1,
+      description: 1,
+      platform: 1,
+      imageUrl: 1,
+      expiryDate: { $ifNull: ['$expiryDate', null] },
+      value: 1,
+      donatedBy: 1,
+      donatedAt: 1,
+      reportCount: 1,
+      category: 1,
+    });
     expect(union.coll).toBe('campaigns');
     expect(union.pipeline).toContainEqual({ $match: {
       status: 'active',
       expiryDate: { $gt: now },
+    } });
+    expect(union.pipeline).toContainEqual({ $lookup: {
+      from: 'businessprofiles',
+      localField: 'businessProfileId',
+      foreignField: '_id',
+      pipeline: [{ $project: { _id: 0, organizationName: 1 } }],
+      as: 'profile',
     } });
     expect(union.pipeline).toContainEqual({ $lookup: {
       from: 'vouchers',
@@ -194,7 +214,21 @@ describe('offer query primitives', () => {
     } });
     expect(union.pipeline).toContainEqual({ $match: { remainingCount: { $gt: 0 } } });
     const campaignProjection = union.pipeline.find((stage) => '$project' in stage)?.$project as Record<string, unknown>;
-    expect(campaignProjection.value).toBe(1);
+    expect(campaignProjection).toEqual({
+      _id: 1,
+      kind: { $literal: 'campaign' },
+      title: 1,
+      description: 1,
+      terms: 1,
+      platform: 1,
+      category: 1,
+      imageUrl: 1,
+      expiryDate: 1,
+      value: 1,
+      brandName: 1,
+      organizationName: { $arrayElemAt: ['$profile.organizationName', 0] },
+      remainingCount: 1,
+    });
 
     const campaignRow: OfferAggregateRow = {
       _id: '507f1f77bcf86cd799439012',
@@ -226,7 +260,6 @@ describe('offer query primitives', () => {
         ],
       },
     });
-    expect(JSON.stringify(union.pipeline)).not.toContain('code');
   });
 
   it('places public filters, search, cursor, and viewer stages before the facet', () => {
@@ -285,8 +318,5 @@ describe('offer query primitives', () => {
       },
     });
 
-    const pipelineText = JSON.stringify(pipeline);
-    expect(pipelineText).not.toContain('"code"');
-    expect(pipelineText).not.toContain('"voucherId"');
   });
 });

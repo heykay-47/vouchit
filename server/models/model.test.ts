@@ -57,6 +57,7 @@ describe('mongoose models', () => {
     expect(indexes).toEqual(expect.arrayContaining([
       [{ businessId: 1 }, expect.anything()],
       [{ status: 1 }, expect.anything()],
+      [{ status: 1, expiryDate: 1, _id: 1 }, expect.anything()],
     ]));
   });
 
@@ -112,6 +113,9 @@ describe('mongoose models', () => {
           partialFilterExpression: { sourceType: 'campaign' },
         }),
       ],
+      [{ sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 }, expect.anything()],
+      [{ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 }, expect.anything()],
+      [{ campaignId: 1, redeemedBy: 1 }, expect.anything()],
     ]));
   });
 
