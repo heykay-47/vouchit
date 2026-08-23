@@ -8,7 +8,7 @@ This is an implemented B2B/B2C workflow, not a claim of payment processing, vouc
 
 ## Customer Experience
 
-Customers browse an available-only catalog backed by server-side search and platform, category, source, and expiring-soon filters. Results are ordered by expiry: community vouchers appear individually, while each active business campaign appears as one grouped offer with terms and remaining inventory. An authenticated customer can redeem an available community voucher or claim one campaign code per customer for each campaign. Donation, favorites, comments, reports, requests, and relevant history remain customer-only features.
+Customers browse a catalog backed by server-side search and platform, category, source, and expiring-soon filters. Results are ordered by expiry: available community vouchers appear individually, while each eligible active business campaign with remaining claimable inventory appears as one grouped offer with terms and an inventory count. An authenticated customer can redeem an available community voucher or claim one campaign code per customer for each campaign. Donation, favorites, comments, reports, requests, and relevant history remain customer-only features.
 
 Customer signup creates the `customer` role. Business accounts cannot use customer mutation actions, even if they can inspect public voucher information.
 
@@ -23,7 +23,7 @@ Business signup creates a `business` role and a business profile. A business can
 5. Publish inventory only after the invoice is marked paid by the recorded settlement flow.
 6. Observe aggregate voucher views and claims for paid active or completed campaigns when analytics are available.
 
-Active inventory is discoverable as one coherent campaign offer rather than duplicate cards for every private code. The catalog exposes the campaign terms and remaining inventory without exposing codes before a successful customer claim.
+Eligible active campaigns with remaining claimable inventory are discoverable as one coherent offer without exposing a card for every private code. The catalog exposes the campaign terms and remaining inventory without exposing codes before a successful customer claim.
 
 The prototype does not process card payments, verify a bank transfer, deliver vouchers outside the application, or guarantee that a claimed voucher will work with its provider.
 

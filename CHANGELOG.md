@@ -6,7 +6,7 @@ All notable changes to VouchIt are documented here.
 
 ### Added
 
-- Added available-only server-side offer discovery with search, core filters, expiry-first ordering, grouped campaign inventory, remaining-code display, and one campaign claim per customer.
+- Added server-side offer discovery for available community vouchers and eligible active campaigns with remaining claimable inventory, including search, core filters, expiry-first ordering, grouped inventory, remaining-code display, and one claim per customer per campaign.
 - Added idempotent customer and business demo fixtures, including paid campaigns, settlement evidence, claimed and remaining inventory, observed views, and expired campaign history.
 - Added truthful B2B/B2C product and deployment documentation with the role-aware recruiter flow and complete business API table.
 - Added Papa Parse to the documented business inventory stack and documented integer-paise campaign pricing with recorded external/offline settlement.

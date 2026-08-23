@@ -54,14 +54,14 @@ Keep `DEMO_PASSWORD` out of committed files and shell history. The seed script i
 ## 4. Recruiter Demo Flow
 
 1. Open the Vercel URL.
-2. Browse the available-only catalog without logging in. Show server-side search, platform/category/source and expiring-soon filters, expiry-first ordering, individual community vouchers, and the grouped campaign offer with its remaining count.
+2. Browse the catalog without logging in. Show server-side search, platform/category/source and expiring-soon filters, expiry-first ordering, individual available community vouchers, and eligible active grouped campaigns with remaining claimable inventory.
 3. Sign in with a seeded customer identity and the locally selected password to show the customer role, favorite a community voucher, and redeem it through the community-only flow.
 4. Open Community to show requests, leaderboard, activity, comments, and customer history.
 5. Sign in with the seeded business identity and the locally selected password to show the business role and campaign workspace.
 6. Create or open a campaign draft, enter campaign details and expiry, then upload a CSV inventory.
 7. Review Papa Parse accepted rows and rejected rows, confirm the accepted inventory, and issue the invoice.
 8. Record matching external or offline settlement evidence. VouchIt records the evidence; it does not process the payment.
-9. Return to the catalog to show that settlement-gated inventory appears as one coherent grouped campaign offer with remaining inventory. A seeded customer without a prior claim can claim one assigned code; the same customer cannot claim another code from that campaign.
+9. Return to the catalog to show that settlement-gated inventory appears as one coherent grouped campaign offer with remaining inventory. The seeded customer `demo@vouchit.app` already claimed from this campaign; use `maya@vouchit.app` to demonstrate a fresh claim. Each customer can claim only one code from the campaign.
 10. Return to the business workspace to show the paid invoice, active campaign, claimed and remaining inventory, observed views, and claims. The seeded expired campaign provides completed-history evidence.
 
 ## 5. Free-Tier Notes

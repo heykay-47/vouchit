@@ -662,14 +662,11 @@ const run = async () => {
     vouchers[fixture.code] = await upsertFixture(Voucher, filter, voucherData);
   }
 
-  const seededUserIds = Object.values(users).map((user) => user._id);
-  const unredeemedVoucherIds = fixtures.vouchers
-    .filter((fixture) => !fixture.isRedeemed)
+  const seededVoucherIds = fixtures.vouchers
     .map((fixture) => vouchers[fixture.code]._id);
-  if (unredeemedVoucherIds.length > 0) {
+  if (seededVoucherIds.length > 0) {
     await RedeemedVoucher.deleteMany({
-      voucherId: { $in: unredeemedVoucherIds },
-      userId: { $in: seededUserIds },
+      voucherId: { $in: seededVoucherIds },
     });
   }
 

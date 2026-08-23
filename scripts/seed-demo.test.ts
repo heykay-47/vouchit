@@ -117,7 +117,30 @@ describe('demo seed fixtures', () => {
     expect(source).toContain('voucherSchema.index({ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, expiryDate: 1, _id: 1 });');
     expect(source).toContain('voucherSchema.index({ campaignId: 1, redeemedBy: 1 });');
     expect(source).toContain("campaignId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campaign', default: null }");
-    expect(source).toContain("partialFilterExpression: { campaignId: { $type: 'objectId' } }");
+    expect(source).toContain(`redeemedVoucherSchema.index(
+  { userId: 1, campaignId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { campaignId: { $type: 'objectId' } },
+  },
+);`);
+  });
+
+  it('deletes all reset voucher history before recreating expected redemptions', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/seed-demo.mjs'), 'utf8');
+    const cleanupStart = source.indexOf('const seededVoucherIds = fixtures.vouchers');
+    const recreationStart = source.indexOf('for (const fixture of fixtures.vouchers.filter((item) => item.isRedeemed))');
+
+    expect(cleanupStart).toBeGreaterThan(-1);
+    expect(recreationStart).toBeGreaterThan(cleanupStart);
+
+    const cleanupSource = source.slice(cleanupStart, recreationStart);
+    expect(cleanupSource).toContain(`const seededVoucherIds = fixtures.vouchers
+    .map((fixture) => vouchers[fixture.code]._id);`);
+    expect(cleanupSource).toContain(`await RedeemedVoucher.deleteMany({
+      voucherId: { $in: seededVoucherIds },
+    });`);
+    expect(cleanupSource).not.toContain('userId:');
   });
 
   it('documents grouped offer discovery and its claim boundary', () => {
@@ -135,13 +158,18 @@ describe('demo seed fixtures', () => {
     expect(product).toContain('remaining inventory');
     expect(changelog).toContain('server-side offer discovery');
     expect(deployment).toContain('grouped campaign offer');
+    expect(deployment).toContain('demo@vouchit.app` already claimed');
+    expect(deployment).toContain('maya@vouchit.app` to demonstrate a fresh claim');
   });
 
   it('requires a caller-provided password without printing demo credentials', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/seed-demo.mjs'), 'utf8');
+    const exampleEnv = readFileSync(resolve(process.cwd(), '.env.example'), 'utf8');
 
     expect(source).toContain("throw new Error('DEMO_PASSWORD is required')");
     expect(source).not.toMatch(/process\.env\.DEMO_PASSWORD\s*\|\|/);
     expect(source).not.toMatch(/console\.log\('(Customer|Business) login:/);
+    expect(exampleEnv).toContain('DEMO_PASSWORD=\n');
+    expect(exampleEnv).not.toContain('DemoPass123!');
   });
 });

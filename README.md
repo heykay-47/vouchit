@@ -1,6 +1,6 @@
 # VouchIt
 
-A voucher sharing platform where customers discover and claim available community vouchers or grouped business campaign offers before expiry.
+A voucher sharing platform where customers discover and claim available community vouchers or offers from eligible active business campaigns with remaining claimable inventory before expiry.
 
 ## Quick Start
 
@@ -44,7 +44,7 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 
 VouchIt supports both sides of the marketplace without claiming that a payment processor or fulfillment network is built in:
 
-- **Customers** use server-side search, platform/category/source filters, and an expiring-soon filter over available offers ordered by expiry. Community vouchers stay individual; each active business campaign appears once with its remaining inventory, and a customer can claim at most one code from that campaign.
+- **Customers** use server-side search, platform/category/source filters, and an expiring-soon filter over available offers ordered by expiry. Community vouchers stay individual; each eligible active business campaign with remaining claimable inventory appears once, and a customer can claim at most one code from that campaign.
 - **Businesses** create a campaign draft, validate and confirm CSV inventory, receive a paise-denominated invoice, and record external or offline settlement evidence. Settlement is recorded by VouchIt; it is not processed by VouchIt.
 - **Publishing** is settlement-gated. Paid campaign inventory becomes one coherent discoverable offer with a remaining-code count, while the business workspace shows observed voucher views and claims when analytics exist.
 - **Pricing** is `₹99 + ₹2 per confirmed campaign voucher`, represented internally as `9900 + 200 * quantity` paise.
@@ -62,7 +62,7 @@ VouchIt supports both sides of the marketplace without claiming that a payment p
 ### Offers
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/offers` | No | Search and filter available community vouchers and grouped campaign offers in expiry-first order |
+| GET | `/api/offers` | No | Search and filter available community vouchers and eligible active campaigns with remaining claimable inventory in expiry-first order |
 | POST | `/api/offers/campaign/:campaignId/claim` | Customer | Claim one remaining campaign code, limited to one code per customer per campaign |
 | POST | `/api/offers/campaign/:campaignId/view` | No | Record a best-effort view against eligible grouped campaign inventory |
 
