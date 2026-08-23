@@ -1,65 +1,388 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Voucher } from '@/lib/types';
+import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
+import type {
+  CampaignOffer,
+  CommunityOffer,
+  ResolvedVoucher,
+  User,
+  Voucher,
+} from '@/lib/types';
 import Browse from './Browse';
 
 const mocks = vi.hoisted(() => ({
-  vouchers: [] as Voucher[],
+  claimCampaign: vi.fn(),
+  openLogin: vi.fn(),
+  recordCampaignView: vi.fn(),
+  useAuth: vi.fn(),
+  useOffersQuery: vi.fn(),
+}));
+
+vi.mock('@/hooks/useOffersQuery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/useOffersQuery')>();
+  return { ...actual, useOffersQuery: mocks.useOffersQuery };
+});
+
+vi.mock('@/services/offer.service', () => ({
+  offerService: {
+    claimCampaign: mocks.claimCampaign,
+    recordCampaignView: mocks.recordCampaignView,
+  },
+}));
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => mocks.useAuth(),
+}));
+
+vi.mock('@/contexts/AuthDialogContext', () => ({
+  useAuthDialog: () => ({ openLogin: mocks.openLogin }),
 }));
 
 vi.mock('@/contexts/VoucherContext', () => ({
-  useVouchers: () => ({ vouchers: mocks.vouchers, isLoading: false }),
+  useVouchers: () => ({ vouchers: [], isLoading: false }),
 }));
 
 vi.mock('@/components/VoucherCard', () => ({
-  default: ({ voucher }: { voucher: Voucher }) => <article>{voucher.title}</article>,
+  default: ({
+    voucher,
+    onRedeemSuccess,
+  }: {
+    voucher: Voucher;
+    onRedeemSuccess?: () => void;
+  }) => (
+    <article>
+      <p>{voucher.title}</p>
+      <button type="button" onClick={onRedeemSuccess}>redeem community offer</button>
+    </article>
+  ),
 }));
 
-const communityVoucher = {
+const communityOffer: CommunityOffer = {
+  kind: 'community',
   id: 'community-1',
   sourceType: 'community',
-  platform: 'Google Pay' as const,
-  title: 'Community Food Reward',
-  description: 'A community voucher',
+  platform: 'Google Pay',
+  category: undefined,
+  title: 'Community reward',
+  description: 'Shared reward',
   imageUrl: 'https://example.com/community.png',
-  donatedBy: 'donor-1',
-  donatedAt: new Date('2026-08-10T00:00:00Z'),
+  expiryDate: new Date('2026-09-01T00:00:00.000Z'),
+  donatedBy: 'anonymous',
+  donatedAt: new Date('2026-08-23T00:00:00.000Z'),
   isRedeemed: false,
   reportCount: 0,
   isActive: true,
-} as Voucher;
+};
 
-const campaignVoucher = {
-  ...communityVoucher,
+const campaignOffer: CampaignOffer = {
+  kind: 'campaign',
   id: 'campaign-1',
+  title: 'Weekend Reward',
+  description: 'Use this weekend',
+  terms: 'One use per customer',
+  platform: 'Google Pay',
+  category: 'Shopping',
+  imageUrl: 'https://example.com/campaign.png',
+  expiryDate: new Date('2026-09-02T00:00:00.000Z'),
+  brandName: 'Fresh Rewards',
+  organizationName: 'Fresh Market Ltd',
+  remainingCount: 3,
+};
+
+const { kind: _kind, ...claimedBase } = communityOffer;
+const claimedVoucher: ResolvedVoucher = {
+  ...claimedBase,
+  id: 'campaign-voucher-1',
   sourceType: 'campaign',
-  title: 'Acme Weekend Reward',
-  description: 'A campaign voucher',
-  campaign: {
-    campaignId: 'campaign-1',
-    brandName: 'Acme Rewards',
-    organizationName: 'Acme Offers',
-  },
-} as unknown as Voucher;
+  code: 'ASSIGNED-CODE',
+  isRedeemed: true,
+  redeemedBy: 'customer-1',
+  redeemedAt: new Date('2026-08-23T01:00:00.000Z'),
+};
+
+const customer: User = {
+  id: 'customer-1',
+  email: 'customer@example.com',
+  username: 'customer',
+  role: 'customer',
+  createdAt: new Date('2026-08-23T00:00:00.000Z'),
+  redeemedVouchers: [],
+};
+
+const fetchNextPage = vi.fn();
+const refetch = vi.fn();
+const baseQuery = {
+  isPending: false,
+  isError: false,
+  isFetchNextPageError: false,
+  isFetchingNextPage: false,
+  hasNextPage: false,
+  fetchNextPage,
+  refetch,
+};
+
+let queryClient: QueryClient;
+
+const browseTree = (route = '/browse') => (
+  <QueryClientProvider client={queryClient}>
+    <MemoryRouter initialEntries={[route]}>
+      <Browse />
+    </MemoryRouter>
+  </QueryClientProvider>
+);
+
+const renderBrowse = (route = '/browse') => render(browseTree(route));
+
+const setQuery = (
+  overrides: Partial<ReturnType<typeof useOffersQuery>>,
+) => {
+  vi.mocked(useOffersQuery).mockReturnValue({
+    ...baseQuery,
+    ...overrides,
+  } as ReturnType<typeof useOffersQuery>);
+};
 
 describe('Browse', () => {
   beforeEach(() => {
-    mocks.vouchers = [communityVoucher, campaignVoucher];
+    vi.clearAllMocks();
+    fetchNextPage.mockResolvedValue(undefined);
+    refetch.mockResolvedValue(undefined);
+    mocks.claimCampaign.mockResolvedValue({
+      voucher: claimedVoucher,
+      message: 'Campaign voucher claimed',
+    });
+    mocks.recordCampaignView.mockResolvedValue({ recorded: true });
+    mocks.useAuth.mockReturnValue({ isAuthenticated: true, user: customer });
+    queryClient = new QueryClient({
+      defaultOptions: {
+        mutations: { retry: false },
+        queries: { retry: false },
+      },
+    });
   });
 
-  it('lists campaign content beside community content and searches attribution', async () => {
+  it('restores URL filters and renders totals with the correct union cards', () => {
+    setQuery({
+      data: {
+        pages: [{
+          offers: [communityOffer, campaignOffer],
+          total: 2,
+          nextCursor: null,
+          hasMore: false,
+        }],
+        pageParams: [null],
+      },
+    });
+
+    renderBrowse('/browse?q=reward&platform=Google+Pay&category=Shopping&source=campaign&expiring=true');
+
+    expect(screen.getByText('2 offers found')).toBeInTheDocument();
+    expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Weekend Reward.*view details/i })).toBeInTheDocument();
+    expect(useOffersQuery).toHaveBeenCalledWith({
+      q: 'reward',
+      platform: 'Google Pay',
+      category: 'Shopping',
+      source: 'campaign',
+      expiringSoon: true,
+    });
+  });
+
+  it('de-duplicates appended pages by kind and id without hiding cross-kind ids', () => {
+    const crossKindCampaign = {
+      ...campaignOffer,
+      id: communityOffer.id,
+      title: 'Cross-kind campaign',
+    };
+    setQuery({
+      data: {
+        pages: [
+          {
+            offers: [communityOffer],
+            total: 2,
+            nextCursor: 'next',
+            hasMore: true,
+          },
+          {
+            offers: [communityOffer, crossKindCampaign],
+            total: 2,
+            nextCursor: null,
+            hasMore: false,
+          },
+        ],
+        pageParams: [null, 'next'],
+      },
+    });
+
+    renderBrowse();
+
+    expect(screen.getAllByText(communityOffer.title)).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /Cross-kind campaign.*view details/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'load more offers' })).not.toBeInTheDocument();
+  });
+
+  it('shows the exact initial loading state without an empty result', () => {
+    setQuery({ isPending: true, data: undefined });
+
+    renderBrowse();
+
+    expect(screen.getByText('loading...')).toBeInTheDocument();
+    expect(screen.queryByText('no offers are available right now')).not.toBeInTheDocument();
+  });
+
+  it('retries a first-page error', async () => {
     const user = userEvent.setup();
-    render(<Browse />);
+    setQuery({ isError: true, data: undefined });
+    renderBrowse();
 
-    expect(screen.getByText('2 vouchers found')).toBeInTheDocument();
-    expect(screen.getByText('Community Food Reward')).toBeInTheDocument();
-    expect(screen.getByText('Acme Weekend Reward')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'retry loading offers' }));
 
-    await user.type(screen.getByPlaceholderText('search...'), 'Acme Offers');
+    expect(refetch).toHaveBeenCalledOnce();
+  });
 
-    expect(screen.getByText('1 vouchers found')).toBeInTheDocument();
-    expect(screen.queryByText('Community Food Reward')).not.toBeInTheDocument();
-    expect(screen.getByText('Acme Weekend Reward')).toBeInTheDocument();
+  it('keeps loaded offers while retrying a later-page failure', async () => {
+    const user = userEvent.setup();
+    setQuery({
+      isError: true,
+      isFetchNextPageError: true,
+      hasNextPage: true,
+      data: {
+        pages: [{
+          offers: [communityOffer],
+          total: 2,
+          nextCursor: 'next',
+          hasMore: true,
+        }],
+        pageParams: [null],
+      },
+    });
+    renderBrowse();
+
+    expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'retry loading more offers' }));
+
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'retry loading offers' })).not.toBeInTheDocument();
+  });
+
+  it('disables load more with exact copy while the next page is fetching', () => {
+    setQuery({
+      isFetchingNextPage: true,
+      hasNextPage: true,
+      data: {
+        pages: [{
+          offers: [communityOffer],
+          total: 2,
+          nextCursor: 'next',
+          hasMore: true,
+        }],
+        pageParams: [null],
+      },
+    });
+
+    renderBrowse();
+
+    expect(screen.getByText(communityOffer.title)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'loading more...' })).toBeDisabled();
+  });
+
+  it('loads the next page from the active pagination control', async () => {
+    const user = userEvent.setup();
+    setQuery({
+      hasNextPage: true,
+      data: {
+        pages: [{
+          offers: [communityOffer],
+          total: 2,
+          nextCursor: 'next',
+          hasMore: true,
+        }],
+        pageParams: [null],
+      },
+    });
+    renderBrowse();
+
+    await user.click(screen.getByRole('button', { name: 'load more offers' }));
+
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('distinguishes no active inventory from an empty filtered result', async () => {
+    const user = userEvent.setup();
+    setQuery({
+      data: {
+        pages: [{ offers: [], total: 0, nextCursor: null, hasMore: false }],
+        pageParams: [null],
+      },
+    });
+    const view = renderBrowse();
+
+    expect(screen.getByText('no offers are available right now')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'clear filters' })).not.toBeInTheDocument();
+
+    view.unmount();
+    renderBrowse('/browse?source=community');
+    expect(screen.getByText('no offers match these filters')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'clear filters' }));
+    await waitFor(() => expect(useOffersQuery).toHaveBeenLastCalledWith({
+      q: '',
+      source: 'all',
+      expiringSoon: false,
+    }));
+  });
+
+  it('invalidates server offers after a community redemption succeeds', async () => {
+    const user = userEvent.setup();
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    setQuery({
+      data: {
+        pages: [{
+          offers: [communityOffer],
+          total: 1,
+          nextCursor: null,
+          hasMore: false,
+        }],
+        pageParams: [null],
+      },
+    });
+    renderBrowse();
+
+    await user.click(screen.getByRole('button', { name: 'redeem community offer' }));
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: offersQueryKey });
+  });
+
+  it('keeps claim success mounted after the campaign leaves the grid', async () => {
+    const user = userEvent.setup();
+    setQuery({
+      data: {
+        pages: [{
+          offers: [campaignOffer],
+          total: 1,
+          nextCursor: null,
+          hasMore: false,
+        }],
+        pageParams: [null],
+      },
+    });
+    const view = renderBrowse();
+    await user.click(screen.getByRole('button', { name: /Weekend Reward.*view details/i }));
+    await user.click(screen.getByRole('button', { name: 'claim from campaign' }));
+    expect(await screen.findByText('ASSIGNED-CODE')).toBeInTheDocument();
+
+    setQuery({
+      data: {
+        pages: [{ offers: [], total: 0, nextCursor: null, hasMore: false }],
+        pageParams: [null],
+      },
+    });
+    view.rerender(browseTree());
+
+    expect(screen.queryByRole('button', { name: /Weekend Reward.*view details/i })).not.toBeInTheDocument();
+    expect(screen.getByText('ASSIGNED-CODE')).toBeInTheDocument();
   });
 });
