@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useCallback, useEffect, useState } from 'react'
 import { Voucher, VoucherContextType } from '@/lib/types'
+import { useAuth } from '@/contexts/AuthContext'
 import { useVoucherOperations } from '@/hooks/useVoucherOperations'
 import { useVouchersQuery } from '@/hooks/useVouchersQuery'
 import { sortVouchers as sortVouchersUtil, searchVouchers as searchVouchersUtil } from '@/utils/voucher-utils'
@@ -8,12 +9,14 @@ const VoucherContext = createContext<VoucherContextType | undefined>(undefined)
 const emptyVouchers: Voucher[] = []
 
 export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { viewerKey, isLoading: isAuthLoading } = useAuth()
+  const activeViewerKey = viewerKey ?? 'unresolved'
   const {
     data: vouchers = emptyVouchers,
     isLoading: isQueryLoading,
     error: queryError,
     refetch,
-  } = useVouchersQuery()
+  } = useVouchersQuery(activeViewerKey, viewerKey !== null && !isAuthLoading)
   const [filteredVouchers, setFilteredVouchers] = useState<Voucher[]>(vouchers)
   const [mutationError, setMutationError] = useState<string | null>(null)
 
@@ -21,7 +24,7 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setFilteredVouchers(vouchers)
   }, [vouchers])
 
-  const { donateVoucher, redeemVoucher, reportVoucher } = useVoucherOperations(setMutationError)
+  const { donateVoucher, redeemVoucher, reportVoucher } = useVoucherOperations(setMutationError, activeViewerKey)
 
   const sortVouchers = useCallback((sortBy: 'newest' | 'expirySoon' | 'highestValue') => {
     setFilteredVouchers(sortVouchersUtil(vouchers, sortBy))
@@ -45,7 +48,7 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const contextValue = useMemo(() => ({
     vouchers,
-    isLoading: isQueryLoading,
+    isLoading: viewerKey === null || isAuthLoading || isQueryLoading,
     loadError,
     mutationError,
     retryVouchers,
@@ -58,6 +61,8 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
     searchVouchers
   }), [
     vouchers,
+    viewerKey,
+    isAuthLoading,
     isQueryLoading,
     loadError,
     mutationError,

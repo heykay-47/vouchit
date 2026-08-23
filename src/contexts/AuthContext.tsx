@@ -10,7 +10,7 @@ import {
   getCurrentUser,
   updateProfile as updateProfileService,
 } from '@/services/auth.service';
-import { apiRequest } from '@/services/api-client';
+import { ApiClientError, apiRequest } from '@/services/api-client';
 import { toast } from '@/utils/toast';
 import { createLogger } from '@/utils/logger';
 
@@ -21,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isViewerResolved, setIsViewerResolved] = useState(false);
   const mountedRef = useRef(true);
   const queryClient = useQueryClient();
 
@@ -38,10 +39,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mountedRef.current) {
           if (apiUser) clearViewerQueries();
           setUser(apiUser ?? null);
+          setIsViewerResolved(true);
           setIsLoading(false);
         }
-      } catch {
-        if (mountedRef.current) setIsLoading(false);
+      } catch (error) {
+        if (mountedRef.current) {
+          if (error instanceof ApiClientError && error.status === 401) {
+            setIsViewerResolved(true);
+          }
+          setIsLoading(false);
+        }
       }
     };
 
@@ -50,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleAuth401 = () => {
       if (mountedRef.current) {
         setUser(null);
+        setIsViewerResolved(true);
         clearViewerQueries();
         toast.error('Your session has expired. Please log in again.');
       }
@@ -77,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     clearViewerQueries();
     setUser(result.user);
+    setIsViewerResolved(true);
     setIsLoading(false);
     toast.success('Welcome back!');
     return result.user;
@@ -97,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     clearViewerQueries();
     setUser(result.user);
+    setIsViewerResolved(true);
     setIsLoading(false);
     toast.success('Account created successfully!');
     return result.user;
@@ -107,10 +117,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const result = await signOut();
     if (!result.success) {
       toast.error('Logout failed');
-    } else {
-      toast.success('Logged out successfully');
+      setIsLoading(false);
+      return;
     }
+    toast.success('Logged out successfully');
     setUser(null);
+    setIsViewerResolved(true);
     clearViewerQueries();
     setIsLoading(false);
   }, [clearViewerQueries]);
@@ -163,15 +175,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { user: apiUser } = await getCurrentUser();
       if (apiUser && mountedRef.current) {
+        if (apiUser.id !== user?.id) clearViewerQueries();
         setUser(apiUser);
+        setIsViewerResolved(true);
       }
     } catch (error) {
       logger.error('Error refreshing user', error);
     }
-  }, []);
+  }, [clearViewerQueries, user?.id]);
 
   const value: AuthContextType = {
     user,
+    viewerKey: isViewerResolved ? user?.id ?? 'anonymous' : null,
     isAuthenticated: !!user,
     isLoading,
     login,

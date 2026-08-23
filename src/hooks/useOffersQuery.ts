@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   useInfiniteQuery,
   useMutation,
@@ -8,7 +9,7 @@ import type { OfferFilters, OfferPage, ResolvedVoucher } from '@/lib/types';
 import { ApiClientError } from '@/services/api-client';
 import { offerService } from '@/services/offer.service';
 import { createLogger } from '@/utils/logger';
-import { vouchersQueryKey } from './useVouchersQuery';
+import { voucherQueryKeys, vouchersQueryKey } from './useVouchersQuery';
 
 const offerLogger = createLogger({ context: { component: 'useOffersQuery' } });
 
@@ -23,13 +24,13 @@ export const offerQueryKeys = {
 };
 
 export const useOffersQuery = (filters: OfferFilters) => {
-  const { user, isLoading } = useAuth();
+  const { viewerKey, isLoading } = useAuth();
   return useInfiniteQuery({
-    queryKey: offerQueryKeys.list(user?.id ?? 'anonymous', filters),
+    queryKey: offerQueryKeys.list(viewerKey ?? 'unresolved', filters),
     queryFn: ({ pageParam }) => offerService.list(filters, pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    enabled: !isLoading,
+    enabled: viewerKey !== null && !isLoading,
   });
 };
 
@@ -45,13 +46,21 @@ export const flattenOfferPages = (pages: OfferPage[]) => {
 
 export const useClaimCampaignMutation = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const activeViewerId = useRef(user?.id);
+  activeViewerId.current = user?.id;
   return useMutation({
     mutationFn: offerService.claimCampaign,
     onSuccess: ({ voucher }) => {
-      queryClient.setQueryData<ResolvedVoucher[]>(vouchersQueryKey, (current) => [
-        voucher,
-        ...(current ?? []).filter((item) => item.id !== voucher.id),
-      ]);
+      if (voucher.redeemedBy && voucher.redeemedBy === activeViewerId.current) {
+        queryClient.setQueryData<ResolvedVoucher[]>(
+          voucherQueryKeys.list(voucher.redeemedBy),
+          (current) => [
+            voucher,
+            ...(current ?? []).filter((item) => item.id !== voucher.id),
+          ],
+        );
+      }
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: offersQueryKey }),
         queryClient.invalidateQueries({ queryKey: vouchersQueryKey }),

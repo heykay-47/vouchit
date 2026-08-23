@@ -108,7 +108,7 @@ let wrapper: ({ children }: PropsWithChildren) => ReturnType<typeof createElemen
 describe('offer queries', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.useAuth.mockReturnValue({ user: customer, isLoading: false });
+    mocks.useAuth.mockReturnValue({ user: customer, viewerKey: customer.id, isLoading: false });
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -142,14 +142,14 @@ describe('offer queries', () => {
   });
 
   it('uses an anonymous viewer key and waits for auth loading to finish', async () => {
-    mocks.useAuth.mockReturnValue({ user: null, isLoading: true });
+    mocks.useAuth.mockReturnValue({ user: null, viewerKey: null, isLoading: true });
     vi.mocked(offerService.list).mockResolvedValue(firstPage);
 
     const { result, rerender } = renderHook(() => useOffersQuery(defaultFilters), { wrapper });
     expect(result.current.fetchStatus).toBe('idle');
     expect(offerService.list).not.toHaveBeenCalled();
 
-    mocks.useAuth.mockReturnValue({ user: null, isLoading: false });
+    mocks.useAuth.mockReturnValue({ user: null, viewerKey: 'anonymous', isLoading: false });
     rerender();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
@@ -170,7 +170,10 @@ describe('offer queries', () => {
     const staleClaim = { ...claimedVoucher, code: 'STALE-CODE' };
     const response = { voucher: claimedVoucher, message: 'Campaign voucher claimed' };
     vi.mocked(offerService.claimCampaign).mockResolvedValue(response);
-    queryClient.setQueryData(vouchersQueryKey, [existingVoucher, staleClaim]);
+    const activeViewerKey = [...vouchersQueryKey, customer.id] as const;
+    const otherViewerKey = [...vouchersQueryKey, 'customer-2'] as const;
+    queryClient.setQueryData(activeViewerKey, [existingVoucher, staleClaim]);
+    queryClient.setQueryData(otherViewerKey, [staleClaim]);
     let resolveRefresh!: () => void;
     const refreshPending = new Promise<void>((resolve) => { resolveRefresh = resolve; });
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockReturnValue(refreshPending);
@@ -179,10 +182,39 @@ describe('offer queries', () => {
     await act(async () => result.current.mutateAsync('campaign-1'));
 
     await waitFor(() => expect(result.current.data).toEqual(response));
-    expect(queryClient.getQueryData(vouchersQueryKey)).toEqual([claimedVoucher, existingVoucher]);
+    expect(queryClient.getQueryData(activeViewerKey)).toEqual([claimedVoucher, existingVoucher]);
+    expect(queryClient.getQueryData(otherViewerKey)).toEqual([staleClaim]);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: offersQueryKey });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: vouchersQueryKey });
     resolveRefresh();
+  });
+
+  it('does not seed a completed claim into a different active viewer cache', async () => {
+    let resolveClaim!: (value: { voucher: ResolvedVoucher; message: string }) => void;
+    const claimPending = new Promise<{ voucher: ResolvedVoucher; message: string }>((resolve) => {
+      resolveClaim = resolve;
+    });
+    vi.mocked(offerService.claimCampaign).mockReturnValue(claimPending);
+    const firstViewerKey = [...vouchersQueryKey, customer.id] as const;
+    const secondViewerKey = [...vouchersQueryKey, 'customer-2'] as const;
+    const { result, rerender } = renderHook(() => useClaimCampaignMutation(), { wrapper });
+
+    let mutation!: Promise<{ voucher: ResolvedVoucher; message: string }>;
+    act(() => { mutation = result.current.mutateAsync('campaign-1'); });
+    mocks.useAuth.mockReturnValue({
+      user: { ...customer, id: 'customer-2' },
+      viewerKey: 'customer-2',
+      isLoading: false,
+    });
+    rerender();
+
+    await act(async () => {
+      resolveClaim({ voucher: claimedVoucher, message: 'Campaign voucher claimed' });
+      await mutation;
+    });
+
+    expect(queryClient.getQueryData(firstViewerKey)).toBeUndefined();
+    expect(queryClient.getQueryData(secondViewerKey)).toBeUndefined();
   });
 
   it('refreshes discovery after a claim conflict', async () => {

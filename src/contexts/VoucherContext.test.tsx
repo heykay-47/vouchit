@@ -16,6 +16,10 @@ vi.mock('@/hooks/useVouchersQuery', () => ({
   useVouchersQuery: () => queryResult,
 }));
 
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null, viewerKey: 'anonymous', isLoading: false }),
+}));
+
 vi.mock('@/hooks/useVoucherOperations', () => ({
   useVoucherOperations: () => ({
     donateVoucher: vi.fn(),

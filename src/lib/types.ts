@@ -189,6 +189,7 @@ export interface UserPreference {
 
 export interface AuthContextType {
   user: User | null;
+  viewerKey: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<User>;

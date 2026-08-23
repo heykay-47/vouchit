@@ -1,7 +1,7 @@
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from '@/utils/toast';
 import { Voucher } from '@/lib/types';
-import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
+import { voucherQueryKeys, vouchersQueryKey } from '@/hooks/useVouchersQuery';
 import { offersQueryKey } from '@/hooks/useOffersQuery';
 import { createLogger } from '@/utils/logger';
 import { voucherService } from '@/services/voucher.service';
@@ -10,7 +10,10 @@ const voucherLogger = createLogger({ context: { component: 'useVoucherOperations
 
 type DonatePayload = Omit<Voucher, 'id' | 'donatedAt' | 'reportCount' | 'isActive'>;
 
-export const useVoucherOperations = (setMutationError: (message: string | null) => void) => {
+export const useVoucherOperations = (
+  setMutationError: (message: string | null) => void,
+  viewerKey: string,
+) => {
   const queryClient = useQueryClient();
 
   const donateMutation = useMutation({
@@ -34,7 +37,7 @@ export const useVoucherOperations = (setMutationError: (message: string | null) 
       toast.success('Voucher redeemed successfully');
       setMutationError(null);
       const redeemed = response.voucher;
-      queryClient.setQueryData<Voucher[]>(vouchersQueryKey, (current) => {
+      queryClient.setQueryData<Voucher[]>(voucherQueryKeys.list(viewerKey), (current) => {
         if (!current) return current;
         return current.map((voucher) => (
           voucher.id === redeemed.id ? { ...voucher, ...redeemed } : voucher
