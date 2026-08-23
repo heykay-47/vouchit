@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthContextType, User } from '@/lib/types';
-import { offersQueryKey } from '@/hooks/useOffersQuery';
+import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
 import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
 import { ApiClientError } from '@/services/api-client';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -21,9 +21,15 @@ const voucherServiceMocks = vi.hoisted(() => ({
   redeem: vi.fn(),
   report: vi.fn(),
 }));
+const offerServiceMocks = vi.hoisted(() => ({
+  claimCampaign: vi.fn(),
+  list: vi.fn(),
+  recordCampaignView: vi.fn(),
+}));
 
 vi.mock('@/services/auth.service', () => authServiceMocks);
 vi.mock('@/services/voucher.service', () => ({ voucherService: voucherServiceMocks }));
+vi.mock('@/services/offer.service', () => ({ offerService: offerServiceMocks }));
 vi.mock('@/utils/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const authenticatedUser: User = {
@@ -64,6 +70,11 @@ const ActiveVoucherProbe = () => {
   );
 };
 
+const ActiveOfferProbe = () => {
+  const query = useOffersQuery({ q: '', source: 'all', expiringSoon: false });
+  return <output data-testid="active-offers">{query.data?.pages[0]?.total}</output>;
+};
+
 const renderAuth = () => render(
   <QueryClientProvider client={queryClient}>
     <AuthProvider><Probe /></AuthProvider>
@@ -74,6 +85,17 @@ const renderAuthWithVouchers = () => render(
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <VoucherProvider><ActiveVoucherProbe /></VoucherProvider>
+    </AuthProvider>
+  </QueryClientProvider>,
+);
+
+const renderAuthWithViewerQueries = () => render(
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <VoucherProvider>
+        <ActiveVoucherProbe />
+        <ActiveOfferProbe />
+      </VoucherProvider>
     </AuthProvider>
   </QueryClientProvider>,
 );
@@ -100,7 +122,7 @@ const expectViewerQueriesCleared = () => {
 
 describe('AuthProvider viewer cache safety', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     authServiceMocks.getCurrentUser.mockResolvedValue({ user: null });
     authServiceMocks.signInWithEmail.mockResolvedValue({ success: true, user: authenticatedUser });
@@ -108,6 +130,7 @@ describe('AuthProvider viewer cache safety', () => {
     authServiceMocks.signOut.mockResolvedValue({ success: true });
     voucherServiceMocks.list.mockReset();
     voucherServiceMocks.list.mockResolvedValue([publicVoucher]);
+    offerServiceMocks.list.mockResolvedValue(privateOfferPage);
   });
 
   afterEach(() => {
@@ -189,6 +212,88 @@ describe('AuthProvider viewer cache safety', () => {
     await waitFor(() => expect(auth.isLoading).toBe(false));
     expect(voucherServiceMocks.list).not.toHaveBeenCalled();
     expect(screen.getByTestId('active-vouchers')).toBeEmptyDOMElement();
+  });
+
+  it('recovers viewer-bound queries on reconnect after a transient startup failure', async () => {
+    authServiceMocks.getCurrentUser
+      .mockRejectedValueOnce(new ApiClientError('Network error', 0))
+      .mockResolvedValueOnce({ user: authenticatedUser });
+    voucherServiceMocks.list.mockResolvedValueOnce([firstPrivateVoucher]);
+    offerServiceMocks.list.mockResolvedValueOnce({ ...privateOfferPage, total: 1 });
+
+    renderAuthWithViewerQueries();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    expect(auth.viewerKey).toBeNull();
+    expect(voucherServiceMocks.list).not.toHaveBeenCalled();
+    expect(offerServiceMocks.list).not.toHaveBeenCalled();
+    expect(screen.getByTestId('active-vouchers')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('active-offers')).toBeEmptyDOMElement();
+
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+
+    await expectActiveVouchers('PRIVATE-ONE:CODE-ONE');
+    await waitFor(() => expect(screen.getByTestId('active-offers')).toHaveTextContent('1'));
+    expect(auth.viewerKey).toBe(authenticatedUser.id);
+    expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(2);
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(1);
+    expect(offerServiceMocks.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves anonymous and enables public queries when an explicit retry receives 401', async () => {
+    authServiceMocks.getCurrentUser
+      .mockRejectedValueOnce(new ApiClientError('Network error', 0))
+      .mockRejectedValueOnce(new ApiClientError('Authentication required', 401));
+    offerServiceMocks.list.mockResolvedValueOnce({ ...privateOfferPage, total: 1 });
+
+    renderAuthWithViewerQueries();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    expect(auth.viewerKey).toBeNull();
+    expect(voucherServiceMocks.list).not.toHaveBeenCalled();
+    expect(offerServiceMocks.list).not.toHaveBeenCalled();
+
+    await act(async () => auth.refreshUser());
+
+    await expectActiveVouchers('PUBLIC:public');
+    await waitFor(() => expect(screen.getByTestId('active-offers')).toHaveTextContent('1'));
+    expect(auth.viewerKey).toBe('anonymous');
+    expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(2);
+    expect(voucherServiceMocks.list).toHaveBeenCalledTimes(1);
+    expect(offerServiceMocks.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not duplicate an unresolved auth request across reconnects', async () => {
+    const recovery = deferred<{ user: User }>();
+    authServiceMocks.getCurrentUser
+      .mockRejectedValueOnce(new ApiClientError('Network error', 0))
+      .mockReturnValueOnce(recovery.promise);
+
+    renderAuthWithVouchers();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+
+    expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(2);
+
+    await act(async () => recovery.resolve({ user: authenticatedUser }));
+    await expectActiveVouchers('PUBLIC:public');
+  });
+
+  it('removes unresolved reconnect recovery when the provider unmounts', async () => {
+    authServiceMocks.getCurrentUser.mockRejectedValueOnce(new ApiClientError('Network error', 0));
+    const view = renderAuth();
+    await waitFor(() => expect(auth.isLoading).toBe(false));
+
+    view.unmount();
+    act(() => onlineManager.setOnline(false));
+    act(() => onlineManager.setOnline(true));
+
+    expect(authServiceMocks.getCurrentUser).toHaveBeenCalledTimes(1);
   });
 
   it('does not expose an anonymous cache entry before startup auth resolves', () => {
