@@ -17,25 +17,32 @@ const rawOfferQuerySchema = z.object({
 
 export type OfferQuery = z.infer<typeof rawOfferQuerySchema>;
 export type OfferPipelineStage = Record<string, unknown>;
-export type OfferPipelineInput = OfferQuery & {
+export type OfferViewerRole = 'customer' | 'business';
+export type OfferViewerInput = {
+  viewerId?: string;
+  viewerRole?: OfferViewerRole;
+};
+export type OfferPipelineInput = Omit<OfferQuery, 'cursor'> & {
+  cursor?: string | OfferCursor;
   now?: Date;
   viewerId?: string;
-  expiringSoonUntil?: Date;
+  viewerRole?: OfferViewerRole;
 };
-export type OfferMatchInput = Pick<OfferQuery, 'source' | 'platform' | 'category' | 'expiringSoon'> & {
+export type OfferMatchInput = Partial<Pick<OfferQuery, 'source' | 'platform' | 'category' | 'expiringSoon'>> & {
   now?: Date;
   expiringSoonUntil?: Date;
+  [key: string]: unknown;
 };
 
 export const escapeSearchPattern = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export const parseOfferQuery = (query: unknown) => rawOfferQuerySchema.parse(query);
 
-export const buildPublicMatch = (input: OfferMatchInput): OfferPipelineStage => {
+export const buildPublicMatch = (input: OfferMatchInput): Record<string, unknown> => {
   const match: Record<string, unknown> = {};
 
-  if (input.source !== 'all') match.kind = input.source;
-  if (input.platform !== undefined) match.platform = input.platform;
-  if (input.category !== undefined) match.category = input.category;
+  if (input.platform) match.platform = input.platform;
+  if (input.category) match.category = input.category;
+  if (input.source && input.source !== 'all') match.kind = input.source;
 
   if (input.expiringSoon) {
     const now = input.now ?? new Date();
@@ -44,120 +51,94 @@ export const buildPublicMatch = (input: OfferMatchInput): OfferPipelineStage => 
     match.expiryDate = { $gt: now, $lte: expiringSoonUntil };
   }
 
-  return { $match: match };
+  return match;
 };
 
-export const buildSearchMatch = (value?: string): OfferPipelineStage | undefined => {
-  if (!value) return undefined;
+export const buildSearchMatch = (value?: string): Record<string, unknown> | null => {
+  if (!value) return null;
   const pattern = escapeSearchPattern(value);
   return {
-    $match: {
-      $or: [
-        { title: { $regex: pattern, $options: 'i' } },
-        { description: { $regex: pattern, $options: 'i' } },
-        { brandName: { $regex: pattern, $options: 'i' } },
-        { organizationName: { $regex: pattern, $options: 'i' } },
-      ],
-    },
+    $or: [
+      { title: { $regex: pattern, $options: 'i' } },
+      { description: { $regex: pattern, $options: 'i' } },
+      { platform: { $regex: pattern, $options: 'i' } },
+      { category: { $regex: pattern, $options: 'i' } },
+      { brandName: { $regex: pattern, $options: 'i' } },
+      { organizationName: { $regex: pattern, $options: 'i' } },
+    ],
   };
 };
 
 export const buildCursorMatch = (
-  cursor: OfferCursor | string | undefined,
-): OfferPipelineStage | undefined => {
-  if (cursor === undefined) return undefined;
+  cursor: OfferCursor | string | null | undefined,
+): Record<string, unknown> | null => {
+  if (cursor == null) return null;
   const parsed = typeof cursor === 'string' ? decodeOfferCursor(cursor) : cursor;
   const id = new mongoose.Types.ObjectId(parsed.id);
 
-  const sameExpiry = parsed.missingExpiry === 0
-    ? [
-      {
-        missingExpiry: 0,
-        expiryDate: { $gt: parsed.expiryDate },
-      },
-      {
-        missingExpiry: 0,
-        expiryDate: parsed.expiryDate,
-        kind: { $gt: parsed.kind },
-      },
-      {
-        missingExpiry: 0,
-        expiryDate: parsed.expiryDate,
-        kind: parsed.kind,
-        _id: { $gt: id },
-      },
-    ]
-    : [
-      {
-        missingExpiry: 1,
-        kind: { $gt: parsed.kind },
-      },
-      {
-        missingExpiry: 1,
-        kind: parsed.kind,
-        _id: { $gt: id },
-      },
-    ];
-
   return {
-    $match: {
-      $or: [
-        { missingExpiry: { $gt: parsed.missingExpiry } },
-        ...sameExpiry,
-      ],
-    },
+    $or: [
+      { missingExpiry: { $gt: parsed.missingExpiry } },
+      ...(parsed.expiryDate ? [{
+        missingExpiry: parsed.missingExpiry,
+        expiryDate: { $gt: parsed.expiryDate },
+      }] : []),
+      {
+        missingExpiry: parsed.missingExpiry,
+        expiryDate: parsed.expiryDate,
+        kind: { $gt: parsed.kind },
+      },
+      {
+        missingExpiry: parsed.missingExpiry,
+        expiryDate: parsed.expiryDate,
+        kind: parsed.kind,
+        _id: { $gt: id },
+      },
+    ],
   };
 };
 
-export const buildViewerClaimStages = (viewerId?: string): OfferPipelineStage[] => {
-  if (!viewerId) return [];
+export const buildViewerClaimStages = ({ viewerId, viewerRole }: OfferViewerInput = {}): OfferPipelineStage[] => {
+  if (!viewerId || viewerRole !== 'customer') return [];
 
   const viewerObjectId = new mongoose.Types.ObjectId(viewerId);
   return [
     {
       $lookup: {
-        from: 'redeemedvouchers',
+        from: 'vouchers',
         let: { campaignId: '$_id' },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$userId', viewerObjectId] },
                   { $eq: ['$campaignId', '$$campaignId'] },
+                  { $eq: ['$sourceType', 'campaign'] },
+                  { $eq: ['$isRedeemed', true] },
+                  { $eq: ['$redeemedBy', viewerObjectId] },
                 ],
               },
             },
           },
           { $limit: 1 },
-          { $project: { _id: 1 } },
         ],
         as: 'viewerClaims',
       },
     },
-    {
-      $match: {
-        $or: [
-          { kind: 'community' },
-          { kind: 'campaign', viewerClaims: { $size: 0 } },
-        ],
-      },
-    },
-    { $unset: 'viewerClaims' },
+    { $set: { viewerClaimed: { $gt: [{ $size: '$viewerClaims' }, 0] } } },
+    { $match: { viewerClaimed: false } },
+    { $unset: ['viewerClaims', 'viewerClaimed'] },
   ];
 };
 
 const communityStages = (now: Date): OfferPipelineStage[] => [
   {
     $match: {
-      isActive: true,
-      isRedeemed: false,
-      $or: [
-        { sourceType: 'community' },
-        { sourceType: { $exists: false } },
-      ],
       $and: [
+        { $or: [{ sourceType: 'community' }, { sourceType: { $exists: false } }] },
         {
+          isActive: true,
+          isRedeemed: false,
           $or: [
             { expiryDate: null },
             { expiryDate: { $exists: false } },
@@ -175,19 +156,12 @@ const communityStages = (now: Date): OfferPipelineStage[] => [
       description: 1,
       platform: 1,
       imageUrl: 1,
-      expiryDate: { $ifNull: ['$expiryDate', null] },
+      expiryDate: 1,
       value: 1,
       donatedBy: 1,
       donatedAt: 1,
       reportCount: 1,
-      category: { $ifNull: ['$category', null] },
-      missingExpiry: {
-        $cond: [
-          { $eq: [{ $ifNull: ['$expiryDate', null] }, null] },
-          1,
-          0,
-        ],
-      },
+      category: 1,
     },
   },
 ];
@@ -205,7 +179,7 @@ const campaignStages = (now: Date): OfferPipelineStage[] => [
       localField: 'businessProfileId',
       foreignField: '_id',
       pipeline: [{ $project: { _id: 0, organizationName: 1 } }],
-      as: 'businessProfile',
+      as: 'profile',
     },
   },
   {
@@ -221,35 +195,26 @@ const campaignStages = (now: Date): OfferPipelineStage[] => [
                 { $eq: ['$sourceType', 'campaign'] },
                 { $eq: ['$isActive', true] },
                 { $eq: ['$isRedeemed', false] },
-                {
-                  $or: [
-                    { $eq: ['$expiryDate', null] },
-                    { $gt: ['$expiryDate', now] },
-                  ],
-                },
+                { $gt: ['$expiryDate', now] },
               ],
             },
           },
         },
-        { $project: { _id: 0, value: 1 } },
+        { $count: 'remainingCount' },
       ],
-      as: 'eligibleInventory',
+      as: 'inventory',
     },
   },
   {
     $set: {
-      kind: { $literal: 'campaign' },
-      organizationName: { $arrayElemAt: ['$businessProfile.organizationName', 0] },
-      remainingCount: { $size: '$eligibleInventory' },
-      value: { $arrayElemAt: ['$eligibleInventory.value', 0] },
-      missingExpiry: { $literal: 0 },
+      remainingCount: { $ifNull: [{ $first: '$inventory.remainingCount' }, 0] },
     },
   },
   { $match: { remainingCount: { $gt: 0 } } },
   {
     $project: {
       _id: 1,
-      kind: 1,
+      kind: { $literal: 'campaign' },
       title: 1,
       description: 1,
       terms: 1,
@@ -257,11 +222,9 @@ const campaignStages = (now: Date): OfferPipelineStage[] => [
       category: 1,
       imageUrl: 1,
       expiryDate: 1,
-      value: 1,
       brandName: 1,
-      organizationName: 1,
+      organizationName: { $arrayElemAt: ['$profile.organizationName', 0] },
       remainingCount: 1,
-      missingExpiry: 1,
     },
   },
 ];
@@ -276,25 +239,34 @@ export const buildOfferPipeline = (input: OfferPipelineInput): OfferPipelineStag
         pipeline: campaignStages(now),
       },
     },
-    buildPublicMatch(input),
+    { $set: { missingExpiry: { $cond: [{ $eq: ['$expiryDate', null] }, 1, 0] } } },
   ];
 
+  const publicMatch = buildPublicMatch(input);
+  if (Object.keys(publicMatch).length > 0) pipeline.push({ $match: publicMatch });
+
   const searchStage = buildSearchMatch(input.q);
-  if (searchStage) pipeline.push(searchStage);
+  if (searchStage) pipeline.push({ $match: searchStage });
+
+  pipeline.push(...buildViewerClaimStages({
+    viewerId: input.viewerId,
+    viewerRole: input.viewerRole,
+  }));
 
   const cursorStage = buildCursorMatch(input.cursor);
-  if (cursorStage) pipeline.push(cursorStage);
-
-  pipeline.push(...buildViewerClaimStages(input.viewerId));
-  pipeline.push(
+  const pageStages: OfferPipelineStage[] = [];
+  if (cursorStage) pageStages.push({ $match: cursorStage });
+  pageStages.push(
     { $sort: { missingExpiry: 1, expiryDate: 1, kind: 1, _id: 1 } },
-    {
-      $facet: {
-        metadata: [{ $count: 'total' }],
-        page: [{ $limit: input.limit }],
-      },
-    },
+    { $limit: input.limit + 1 },
   );
+
+  pipeline.push({
+    $facet: {
+      metadata: [{ $count: 'total' }],
+      page: pageStages,
+    },
+  });
 
   return pipeline;
 };
