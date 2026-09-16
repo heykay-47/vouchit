@@ -26,8 +26,11 @@ supabase/.temp/
 docs/
 
 # AI tool artifacts
+.agent/
 .agents/
 .codex-plugins/
+.openchamber/
+.worktrees/
 
 # Editor directories and files
 .vscode/*

@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-13T01:18:00Z",
+  "title": "Design System: VouchIt",
+  "extensions": {
+    "colorMeta": {
+      "claim-green": {
+        "role": "primary",
+        "displayName": "Claim Green",
+        "canonical": "hsl(158 64% 52%)",
+        "tonalRamp": ["hsl(158 64% 15%)", "hsl(158 64% 25%)", "hsl(158 64% 35%)", "hsl(158 64% 45%)", "hsl(158 64% 55%)", "hsl(158 64% 68%)", "hsl(158 64% 82%)", "hsl(158 64% 95%)"]
+      },
+      "expiry-amber": {
+        "role": "secondary",
+        "displayName": "Expiry Amber",
+        "canonical": "hsl(38 92% 50%)",
+        "tonalRamp": ["hsl(38 92% 15%)", "hsl(38 92% 25%)", "hsl(38 92% 35%)", "hsl(38 92% 45%)", "hsl(38 92% 55%)", "hsl(38 92% 68%)", "hsl(38 92% 82%)", "hsl(38 92% 95%)"]
+      },
+      "destructive-red": {
+        "role": "tertiary",
+        "displayName": "Destructive Red",
+        "canonical": "hsl(0 84% 60%)",
+        "tonalRamp": ["hsl(0 84% 15%)", "hsl(0 84% 25%)", "hsl(0 84% 35%)", "hsl(0 84% 45%)", "hsl(0 84% 55%)", "hsl(0 84% 68%)", "hsl(0 84% 82%)", "hsl(0 84% 95%)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "hsl(0 0% 100%)",
+        "tonalRamp": ["hsl(0 0% 15%)", "hsl(0 0% 25%)", "hsl(0 0% 35%)", "hsl(0 0% 45%)", "hsl(0 0% 55%)", "hsl(0 0% 68%)", "hsl(0 0% 82%)", "hsl(0 0% 95%)"]
+      },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "hsl(0 0% 9%)" },
+      "card-paper": { "role": "neutral", "displayName": "Card Paper", "canonical": "hsl(0 0% 98%)" },
+      "muted-paper": { "role": "neutral", "displayName": "Muted Paper", "canonical": "hsl(0 0% 96%)" },
+      "muted-ink": { "role": "neutral", "displayName": "Muted Ink", "canonical": "hsl(0 0% 45%)" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "hsl(0 0% 90%)" },
+      "night": { "role": "neutral", "displayName": "Night", "canonical": "hsl(0 0% 0%)" },
+      "night-card": { "role": "neutral", "displayName": "Night Card", "canonical": "hsl(0 0% 5%)" },
+      "night-muted": { "role": "neutral", "displayName": "Night Muted", "canonical": "hsl(0 0% 10%)" },
+      "night-muted-ink": { "role": "neutral", "displayName": "Night Muted Ink", "canonical": "hsl(0 0% 55%)" },
+      "night-hairline": { "role": "neutral", "displayName": "Night Hairline", "canonical": "hsl(0 0% 15%)" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Compact page titles and primary section introductions." },
+      "title": { "displayName": "Title", "purpose": "Section and dialog headings." },
+      "body": { "displayName": "Body", "purpose": "Descriptions, instructions, controls, and form content." },
+      "label": { "displayName": "Label", "purpose": "Voucher metadata, statuses, filters, and supporting labels." }
+    },
+    "shadows": [
+      { "name": "card-whisper", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Optional low separation on generic cards; not the default for voucher cards." },
+      { "name": "dialog-lift", "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)", "purpose": "Modal content above the dark scrim." }
+    ],
+    "motion": [
+      { "name": "color-state", "value": "150ms ease", "purpose": "Hover and active color transitions on controls and navigation." },
+      { "name": "overlay-state", "value": "200ms ease-out", "purpose": "Sidebar translation and dialog scale/fade transitions." },
+      { "name": "loading-bounce", "value": "600ms ease-in-out infinite", "purpose": "Staggered three-dot loading feedback." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1200px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action within a local task region.",
+      "html": "<button class=\"ds-btn-primary\">redeem voucher</button>",
+      "css": ".ds-btn-primary { height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 16px; border: 0; border-radius: 6px; background: hsl(var(--primary, 158 64% 52%)); color: hsl(var(--primary-foreground, 0 0% 100%)); font: 500 14px/1.25 system-ui, sans-serif; text-transform: lowercase; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: hsl(158 64% 47%); } .ds-btn-primary:focus-visible { outline: 2px solid hsl(var(--ring, 158 64% 52%)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A secondary action that retains the structural hairline.",
+      "html": "<button class=\"ds-btn-outline\">not working</button>",
+      "css": ".ds-btn-outline { height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border: 1px solid hsl(var(--input, 0 0% 90%)); border-radius: 6px; background: hsl(var(--background, 0 0% 100%)); color: hsl(var(--foreground, 0 0% 9%)); font: 500 14px/1.25 system-ui, sans-serif; text-transform: lowercase; transition: background-color 150ms ease; } .ds-btn-outline:hover { background: hsl(var(--accent, 38 92% 50%)); } .ds-btn-outline:focus-visible { outline: 2px solid hsl(var(--ring, 158 64% 52%)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "A compact, bordered field for search and forms.",
+      "html": "<input class=\"ds-input\" type=\"search\" placeholder=\"search vouchers...\">",
+      "css": ".ds-input { height: 40px; width: 100%; padding: 8px 12px; border: 1px solid hsl(var(--input, 0 0% 90%)); border-radius: 6px; background: hsl(var(--background, 0 0% 100%)); color: hsl(var(--foreground, 0 0% 9%)); font: 400 14px/1.5 system-ui, sans-serif; } .ds-input::placeholder { color: hsl(var(--muted-foreground, 0 0% 45%)); } .ds-input:focus-visible { outline: 2px solid hsl(var(--ring, 158 64% 52%)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "description": "The active state in the desktop rail or mobile drawer.",
+      "html": "<a class=\"ds-nav-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2 9a3 3 0 0 0 0 6v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a3 3 0 0 0 0-6V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z\"/><path d=\"M13 5v2\"/><path d=\"M13 17v2\"/><path d=\"M13 11v2\"/></svg><span>browse</span></a>",
+      "css": ".ds-nav-active { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; background: hsl(var(--primary, 158 64% 52%) / 0.1); color: hsl(var(--primary, 158 64% 52%)); font: 400 14px/1.5 system-ui, sans-serif; text-decoration: none; text-transform: lowercase; transition: background-color 150ms ease; } .ds-nav-active:hover { background: hsl(var(--primary, 158 64% 52%) / 0.16); } .ds-nav-active:focus-visible { outline: 2px solid hsl(var(--ring, 158 64% 52%)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "A compact positive status or selected filter treatment.",
+      "html": "<span class=\"ds-status\">available</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; background: hsl(var(--primary, 158 64% 52%)); color: hsl(var(--primary-foreground, 0 0% 100%)); font: 600 12px/1.4 system-ui, sans-serif; text-transform: lowercase; }"
+    },
+    {
+      "name": "Voucher Card",
+      "kind": "card",
+      "refersTo": "card-voucher",
+      "description": "The signature compact notice used in browsing grids.",
+      "html": "<article class=\"ds-voucher\"><div class=\"ds-voucher-meta\"><span>google pay</span><span class=\"ds-voucher-status\">available</span></div><h3>50% off first order</h3><p>valid on your next food delivery order</p><div class=\"ds-voucher-meta ds-voucher-footer\"><span>expires aug 18</span><strong>INR 100</strong></div></article>",
+      "css": ".ds-voucher { padding: 16px; border: 1px solid hsl(var(--border, 0 0% 90%)); border-radius: 8px; background: hsl(var(--card, 0 0% 98%)); color: hsl(var(--card-foreground, 0 0% 9%)); font-family: system-ui, sans-serif; cursor: pointer; transition: border-color 150ms ease; } .ds-voucher:hover { border-color: hsl(var(--primary, 158 64% 52%) / 0.5); } .ds-voucher h3 { margin: 12px 0 8px; font-size: 14px; font-weight: 500; line-height: 1.25; text-transform: lowercase; } .ds-voucher p { margin: 0 0 16px; color: hsl(var(--muted-foreground, 0 0% 45%)); font-size: 12px; line-height: 1.5; text-transform: lowercase; } .ds-voucher-meta { display: flex; align-items: center; justify-content: space-between; color: hsl(var(--muted-foreground, 0 0% 45%)); font-size: 12px; line-height: 1.4; text-transform: lowercase; } .ds-voucher-status { color: hsl(var(--primary, 158 64% 52%)); } .ds-voucher-footer strong { color: hsl(var(--foreground, 0 0% 9%)); font-weight: 500; } .ds-voucher:focus-within { outline: 2px solid hsl(var(--ring, 158 64% 52%)); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Community Noticeboard",
+    "overview": "VouchIt behaves like a well-kept neighborhood noticeboard translated into a compact web application: useful offers are posted plainly, their status is immediately visible, and participation never competes with decoration. The system is calm, practical, and candid. It favors scanability, compact controls, and matter-of-fact copy over promotional spectacle.\n\nThe visual world is deliberately minimal but not anonymous. Claim Green marks positive action and availability; Expiry Amber introduces time pressure without turning every voucher into an advertisement. Thin borders, modest tonal shifts, and small rounded corners make the interface direct and quietly tactile. Avoid the visual language of a coupon marketplace: no sale bursts, merchant-ad density, loud gradients, or manufactured urgency.",
+    "keyCharacteristics": [
+      "Neutral surfaces with one consistent green action voice.",
+      "Compact information density and short, lowercase interface copy.",
+      "Hairline borders and tonal separation before shadow.",
+      "Status communicated through restrained semantic color.",
+      "Fixed utility navigation on desktop and a focused drawer on mobile."
+    ],
+    "rules": [
+      { "name": "The One Green Voice Rule", "body": "Claim Green owns positive action, availability, focus, and active navigation; do not introduce competing success hues.", "section": "colors" },
+      { "name": "The Amber Means Time Rule", "body": "Expiry Amber appears only when timing or urgency is meaningful.", "section": "colors" },
+      { "name": "The Quiet Canvas Rule", "body": "Neutral surfaces carry most of every screen. Accent color should identify action and status, not flood the layout.", "section": "colors" },
+      { "name": "The Sentence-Case Exception Rule", "body": "Lowercase is the incumbent interface voice, but preserve platform names, voucher codes, user-provided content, and accessibility labels in their meaningful case.", "section": "typography" },
+      { "name": "The Modest Hierarchy Rule", "body": "Use weight and spacing before introducing oversized type; this is an operating interface, not a promotional landing page.", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "If a border or tonal step can explain the hierarchy, do not add a shadow.", "section": "elevation" },
+      { "name": "The Overlay Owns Elevation Rule", "body": "Strong depth is reserved for transient content that must sit above the operating surface.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep most surfaces neutral and reserve Claim Green for positive action, availability, active navigation, and focus.",
+      "Do use Expiry Amber only for genuine time pressure.",
+      "Do preserve compact metadata hierarchy on voucher cards and lists.",
+      "Do use hairline borders and tonal steps before adding elevation.",
+      "Do keep motion brief and functional: color transitions around 150ms-200ms and overlay transitions around 200ms.",
+      "Do maintain equivalent light and pure-black dark themes."
+    ],
+    "donts": [
+      "Don't turn VouchIt into a coupon marketplace with sale bursts, loud gradients, promotional ribbons, or merchant-ad density.",
+      "Don't use large shadows or floating cards as the default depth language.",
+      "Don't introduce extra accent colors when Claim Green, Expiry Amber, or Destructive Red already express the state.",
+      "Don't make every control pill-shaped; reserve full rounding for badges, avatars, and compact status objects.",
+      "Don't uppercase ordinary interface copy or voucher titles as a decorative device.",
+      "Don't expose voucher imagery or codes as browse-card decoration; protected details belong behind authenticated intent."
+    ]
+  }
+}
