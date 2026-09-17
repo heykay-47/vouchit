@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 import { withTransaction } from '../lib/transaction.js';
@@ -19,6 +19,7 @@ const campaigns: Record<string, unknown>[] = [];
 const vouchers: Record<string, unknown>[] = [];
 const invoices: Record<string, unknown>[] = [];
 const organizationName = 'Fresh Market Ltd';
+const testNow = new Date('2026-08-23T12:00:00.000Z');
 let businessProfile: Record<string, unknown> | null;
 let duplicateInvoiceOnCreate = false;
 let failVoucherActivation = false;
@@ -259,6 +260,15 @@ const seedIssuedInvoice = (overrides: Record<string, unknown> = {}) => {
 };
 
 describe('business routes', () => {
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(testNow);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret';
     campaigns.length = 0;

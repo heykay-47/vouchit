@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 import { BusinessProfile } from '../models/BusinessProfile.js';
@@ -13,7 +13,8 @@ const campaigns: any[] = [];
 const profiles: any[] = [];
 process.env.JWT_SECRET = 'test-secret';
 const customerId = '507f1f77bcf86cd799439022';
-const customerToken = signAuthToken({ userId: customerId }, '1h');
+const testNow = new Date('2026-08-23T12:00:00.000Z');
+let customerToken: string;
 const voucherSort = vi.hoisted(() => vi.fn());
 let voucherSequence = 40;
 const makeVoucher = (overrides: Record<string, unknown> = {}) => {
@@ -175,6 +176,16 @@ const validBodyFor = (path: string) => {
 };
 
 describe('voucher routes', () => {
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(testNow);
+    customerToken = signAuthToken({ userId: customerId }, '1h');
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     process.env.JWT_SECRET = 'test-secret';
     vouchers.length = 0;
