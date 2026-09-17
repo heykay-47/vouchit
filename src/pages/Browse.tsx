@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   useLocation,
   useNavigationType,
@@ -12,6 +12,7 @@ import {
 import { OfferFilters } from '@/components/OfferFilters';
 import { Button } from '@/components/ui/button';
 import VoucherCard from '@/components/VoucherCard';
+import VoucherSkeleton from '@/components/VoucherSkeleton';
 import {
   flattenOfferPages,
   useOffersQuery,
@@ -22,6 +23,59 @@ import {
   writeOfferFilters,
 } from '@/lib/offer-filters';
 import type { CampaignOffer, OfferFilters as OfferFilterState } from '@/lib/types';
+
+const INITIAL_SKELETON_COUNT = 6;
+
+function readCssDuration(name: string, fallback: number) {
+  const rawValue = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  const value = Number.parseFloat(rawValue);
+
+  if (!Number.isFinite(value)) return fallback;
+  return rawValue.endsWith('s') && !rawValue.endsWith('ms') ? value * 1000 : value;
+}
+
+function AnimatedButtonLabel({ text }: { text: string }) {
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [renderedText, setRenderedText] = useState(text);
+  const [phase, setPhase] = useState<'idle' | 'exit' | 'enter'>('idle');
+
+  useEffect(() => {
+    if (text === renderedText) return;
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      setRenderedText(text);
+      setPhase('idle');
+      return;
+    }
+
+    setPhase('exit');
+    const timeout = window.setTimeout(() => {
+      setRenderedText(text);
+      setPhase('enter');
+
+      window.requestAnimationFrame(() => {
+        if (labelRef.current) void labelRef.current.offsetHeight;
+        setPhase('idle');
+      });
+    }, readCssDuration('--text-swap-dur', 150));
+
+    return () => window.clearTimeout(timeout);
+  }, [renderedText, text]);
+
+  return (
+    <span
+      ref={labelRef}
+      data-testid="load-more-label"
+      aria-hidden="true"
+      className={`t-text-swap${phase === 'exit' ? ' is-exit' : ''}${phase === 'enter' ? ' is-enter-start' : ''}`}
+    >
+      {renderedText}
+    </span>
+  );
+}
 
 export default function Browse() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,12 +88,23 @@ export default function Browse() {
     trigger: HTMLButtonElement;
   } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [initialOffersRevealed, setInitialOffersRevealed] = useState(true);
   const resultsStatusRef = useRef<HTMLParagraphElement>(null);
   const filters = parseOfferFilters(searchParams);
   const query = useOffersQuery(filters);
   const offers = flattenOfferPages(query.data?.pages ?? []);
   const total = query.data?.pages[0]?.total ?? 0;
   const firstPageError = query.isError && !query.data;
+
+  useEffect(() => {
+    if (query.isPending) {
+      setInitialOffersRevealed(false);
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => setInitialOffersRevealed(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [query.isPending]);
 
   useLayoutEffect(() => {
     const locationChanged = previousLocationKey.current !== location.key;
@@ -89,9 +154,7 @@ export default function Browse() {
       </div>
 
       {query.isPending && (
-        <div className="py-16 text-center">
-          <p role="status" className="text-muted-foreground">loading...</p>
-        </div>
+        <p role="status" className="sr-only">loading offers</p>
       )}
 
       {firstPageError && (
@@ -102,22 +165,44 @@ export default function Browse() {
         </div>
       )}
 
-      {offers.length > 0 && (
+      {(query.isPending || offers.length > 0) && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {offers.map((offer) => (
-            offer.kind === 'community' ? (
-              <VoucherCard
-                key={`${offer.kind}:${offer.id}`}
-                voucher={offer}
-              />
-            ) : (
-              <CampaignOfferCard
-                key={`${offer.kind}:${offer.id}`}
-                offer={offer}
-                onOpen={openCampaign}
-              />
-            )
-          ))}
+          {(query.isPending
+            ? Array.from({ length: INITIAL_SKELETON_COUNT }, () => null)
+            : offers
+          ).map((offer, index) => {
+            const isRevealed = offer !== null
+              && (index >= INITIAL_SKELETON_COUNT || initialOffersRevealed);
+
+            return (
+              <div
+                key={`offer-slot-${index}`}
+                className={`t-skel browse-offer-swap${isRevealed ? ' is-revealed' : ''}`}
+              >
+                <div
+                  aria-hidden="true"
+                  data-testid="offer-loading-placeholder"
+                  className="t-skel-skeleton is-pulsing"
+                >
+                  <VoucherSkeleton />
+                </div>
+                <div className="t-skel-content">
+                  {offer?.kind === 'community' ? (
+                    <VoucherCard
+                      key={`${offer.kind}:${offer.id}`}
+                      voucher={offer}
+                    />
+                  ) : offer?.kind === 'campaign' ? (
+                    <CampaignOfferCard
+                      key={`${offer.kind}:${offer.id}`}
+                      offer={offer}
+                      onOpen={openCampaign}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -155,10 +240,13 @@ export default function Browse() {
             type="button"
             variant="outline"
             className="min-h-11 lowercase"
+            aria-label={query.isFetchingNextPage ? 'loading more...' : 'load more offers'}
             disabled={query.isFetchingNextPage}
             onClick={() => query.fetchNextPage()}
           >
-            {query.isFetchingNextPage ? 'loading more...' : 'load more offers'}
+            <AnimatedButtonLabel
+              text={query.isFetchingNextPage ? 'loading more...' : 'load more offers'}
+            />
           </Button>
         </div>
       )}

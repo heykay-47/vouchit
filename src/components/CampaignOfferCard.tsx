@@ -232,7 +232,25 @@ export function CampaignOfferDialog({
 
           {assignedCode && (
             <div className="rounded-lg bg-muted p-3">
-              <p className="mb-2 text-xs text-muted-foreground lowercase">assigned code</p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground lowercase">assigned code</p>
+                <span
+                  aria-hidden="true"
+                  data-testid="campaign-claim-success"
+                  data-state="in"
+                  className="t-success-check text-primary"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="m5 12 4 4L19 6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              </div>
               <p role="status" className="sr-only">
                 campaign voucher claimed, assigned code {assignedCode}
               </p>

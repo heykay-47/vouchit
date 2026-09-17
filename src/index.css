@@ -48,6 +48,33 @@
     --sidebar-accent-foreground: 0 0% 9%;
     --sidebar-border: 0 0% 90%;
     --sidebar-ring: 158 64% 52%;
+
+    --text-swap-dur: 150ms;
+    --text-swap-translate-y: 4px;
+    --text-swap-blur: 2px;
+    --text-swap-ease: ease-in-out;
+
+    --check-opacity-dur: 500ms;
+    --check-rotate-dur: 500ms;
+    --check-rotate-from: 80deg;
+    --check-bob-dur: 500ms;
+    --check-y-amount: 40px;
+    --check-blur-dur: 500ms;
+    --check-blur-from: 10px;
+    --check-path-dur: 500ms;
+    --check-path-delay: 80ms;
+    --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+    --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+    --check-ease-bob: cubic-bezier(0.22, 1, 0.36, 1);
+    --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --pulse-dur: 1000ms;
+    --pulse-count: 1;
+    --pulse-min: 0.5;
+    --reveal-dur: 400ms;
+    --reveal-blur: 2px;
+    --reveal-ease: ease-in-out;
   }
 
   .dark {
@@ -652,6 +679,140 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
+}
+
+/* Text states swap */
+.t-text-swap {
+  display: inline-block;
+  transform: translateY(0);
+  filter: blur(0);
+  opacity: 1;
+  transition:
+    transform var(--text-swap-dur) var(--text-swap-ease),
+    filter    var(--text-swap-dur) var(--text-swap-ease),
+    opacity   var(--text-swap-dur) var(--text-swap-ease);
+  will-change: transform, filter, opacity;
+}
+.t-text-swap.is-exit {
+  transform: translateY(calc(var(--text-swap-translate-y) * -1));
+  filter: blur(var(--text-swap-blur));
+  opacity: 0;
+}
+.t-text-swap.is-enter-start {
+  transform: translateY(var(--text-swap-translate-y));
+  filter: blur(var(--text-swap-blur));
+  opacity: 0;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-text-swap { transition: none !important; }
+}
+
+/* Success check */
+.t-success-check {
+  display: inline-block;
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+.t-success-check svg { display: block; overflow: visible; }
+.t-success-check svg path {
+  stroke-dasharray: 19;
+  stroke-dashoffset: 19;
+}
+
+.t-success-check[data-state="in"] {
+  animation:
+    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,
+    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,
+    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,
+    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;
+}
+.t-success-check[data-state="in"] svg path {
+  animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;
+}
+
+@keyframes t-check-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes t-check-rotate {
+  from { transform: rotate(var(--check-rotate-from)); }
+  to   { transform: rotate(0deg); }
+}
+@keyframes t-check-blur {
+  from { filter: blur(var(--check-blur-from)); }
+  to   { filter: blur(0); }
+}
+@keyframes t-check-bob {
+  from { translate: 0 var(--check-y-amount); }
+  to   { translate: 0 0; }
+}
+@keyframes t-check-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .t-success-check { animation: none !important; opacity: 1; }
+  .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
+}
+
+/* Skeleton loader and reveal */
+.t-skel { position: relative; }
+.t-skel-skeleton,
+.t-skel-content {
+  position: absolute;
+  inset: 0;
+}
+
+.t-skel-skeleton {
+  z-index: 1;
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    opacity var(--reveal-dur) var(--reveal-ease),
+    filter  var(--reveal-dur) var(--reveal-ease);
+}
+.t-skel-content {
+  z-index: 2;
+  opacity: 0;
+  filter: blur(var(--reveal-blur));
+  transition:
+    opacity var(--reveal-dur) var(--reveal-ease),
+    filter  var(--reveal-dur) var(--reveal-ease);
+}
+.t-skel.is-revealed .t-skel-skeleton {
+  opacity: 0;
+  filter: blur(var(--reveal-blur));
+}
+.t-skel.is-revealed .t-skel-content {
+  opacity: 1;
+  filter: blur(0);
+}
+.t-skel.is-resetting .t-skel-skeleton,
+.t-skel.is-resetting .t-skel-content {
+  transition: none !important;
+}
+
+.t-skel-skeleton.is-pulsing > * {
+  animation: t-skel-pulse var(--pulse-dur) ease-in-out var(--pulse-count);
+}
+@keyframes t-skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: var(--pulse-min); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-skel-skeleton, .t-skel-content {
+    transition: none !important;
+  }
+  .t-skel-skeleton.is-pulsing > * { animation: none !important; }
+}
+
+.browse-offer-swap {
+  min-height: 156px;
+}
+
+.browse-offer-swap .t-skel-content {
+  position: relative;
+  inset: auto;
+  min-height: 156px;
 }
 
 /* Scrollbar styling for dark mode */

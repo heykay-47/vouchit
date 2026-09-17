@@ -293,7 +293,8 @@ describe('Browse', () => {
 
     renderBrowse();
 
-    expect(screen.getByText('loading...')).toHaveAttribute('role', 'status');
+    expect(screen.getByText('loading offers')).toHaveAttribute('role', 'status');
+    expect(screen.getAllByTestId('offer-loading-placeholder')).toHaveLength(6);
     expect(screen.queryByText('no offers are available right now')).not.toBeInTheDocument();
   });
 
@@ -359,6 +360,8 @@ describe('Browse', () => {
     const loadingMore = screen.getByRole('button', { name: 'loading more...' });
     expect(loadingMore).toBeDisabled();
     expect(loadingMore.closest('[role="status"]')).not.toBeNull();
+    expect(screen.getByTestId('load-more-label')).toHaveClass('t-text-swap');
+    expect(screen.getByTestId('load-more-label')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('loads the next page from the active pagination control', async () => {

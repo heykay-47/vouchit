@@ -268,6 +268,8 @@ describe('CampaignOfferCard', () => {
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent('campaign voucher claimed, assigned code ASSIGNED-CODE');
+    expect(screen.getByTestId('campaign-claim-success')).toHaveAttribute('data-state', 'in');
+    expect(screen.getByTestId('campaign-claim-success')).toHaveClass('t-success-check');
     const copy = screen.getByRole('button', { name: 'copy assigned code ASSIGNED-CODE' });
     expect(copy).toBeEnabled();
     expect(copy).toHaveFocus();

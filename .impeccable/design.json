@@ -52,7 +52,10 @@
     "motion": [
       { "name": "color-state", "value": "150ms ease", "purpose": "Hover and active color transitions on controls and navigation." },
       { "name": "overlay-state", "value": "200ms ease-out", "purpose": "Sidebar translation and dialog scale/fade transitions." },
-      { "name": "loading-bounce", "value": "600ms ease-in-out infinite", "purpose": "Staggered three-dot loading feedback." }
+      { "name": "loading-bounce", "value": "600ms ease-in-out infinite", "purpose": "Staggered three-dot loading feedback." },
+      { "name": "async-text-swap", "value": "150ms ease-in-out", "purpose": "Compact action-label changes without resizing the control." },
+      { "name": "content-reveal", "value": "400ms ease-in-out", "purpose": "One-shot skeleton-to-content cross-fade for the offer grid." },
+      { "name": "success-check", "value": "500ms ease-out", "purpose": "A single Claim Green confirmation after a successful campaign claim." }
     ],
     "breakpoints": [
       { "name": "sm", "value": "640px" },
@@ -135,6 +138,8 @@
       "Do preserve compact metadata hierarchy on voucher cards and lists.",
       "Do use hairline borders and tonal steps before adding elevation.",
       "Do keep motion brief and functional: color transitions around 150ms-200ms and overlay transitions around 200ms.",
+      "Do use one-shot state motion for async work: skeleton-to-content reveal, compact action-label swaps, and a single Claim Green success check.",
+      "Do make async content and success states immediately legible when reduced motion is requested.",
       "Do maintain equivalent light and pure-black dark themes."
     ],
     "donts": [

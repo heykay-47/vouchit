@@ -13,6 +13,7 @@ All notable changes to VouchIt are documented here.
 - Added a Vercel-inspired Exchange Board landing page at `/` with public browsing CTA and authenticated donation handoff.
 - Added animated donated, available, and claimed exchange states with reduced-motion support.
 - Added the connected donate, discover, and claim walkthrough with responsive timeline progression.
+- Added reduced-motion-safe browse skeleton reveals, load-more label transitions, and campaign-claim success feedback.
 
 ### Fixed
 

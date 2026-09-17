@@ -227,6 +227,8 @@ The signature card is a compact notice rather than a promotional tile. Its top r
 - **Do** preserve compact metadata hierarchy on voucher cards and lists.
 - **Do** use hairline borders and tonal steps before adding elevation.
 - **Do** keep motion brief and functional: color transitions around 150ms-200ms and overlay transitions around 200ms.
+- **Do** use one-shot state motion for async work: a quiet skeleton-to-content reveal, a compact text swap for changing action labels, and a single Claim Green check after a successful claim.
+- **Do** make async content and success states immediately legible when reduced motion is requested; never make essential feedback depend on animation.
 - **Do** maintain equivalent light and pure-black dark themes.
 
 ### Don't:
