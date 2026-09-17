@@ -16,14 +16,15 @@ dist-ssr
 .env
 .env.local
 
-# Agent instructions
-AGENTS.md
+# Agent instructions are repository configuration.
 
 # WSL/NTFS alternate data streams
 *:Zone.Identifier
 
 supabase/.temp/
-docs/
+docs/*
+!docs/agents/
+!docs/agents/**
 
 # AI tool artifacts
 .agent/
