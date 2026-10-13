@@ -4,7 +4,7 @@ import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
 
 const favorites = new Set<string>();
-const users = new Map<string, any>();
+const users = new Map<string, Record<string, unknown>>();
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
 vi.mock('../models/User', () => ({
@@ -12,7 +12,7 @@ vi.mock('../models/User', () => ({
     findById: vi.fn(async (id: string) => ({
       role: id === '507f1f77bcf86cd799439099' ? 'business' : 'customer',
     })),
-    findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
+    findByIdAndUpdate: vi.fn(async (id: string, update: Record<string, unknown>) => {
       const user = users.get(id) ?? {
         _id: { toString: () => id },
         email: 'student@example.com',
@@ -32,7 +32,7 @@ vi.mock('../models/User', () => ({
 vi.mock('../models/Favorite', () => ({
   Favorite: {
     find: vi.fn(async () => []),
-    create: vi.fn(async (doc: any) => {
+    create: vi.fn(async (doc: { userId: string; voucherId: string }) => {
       const key = `${doc.userId}:${doc.voucherId}`;
       if (favorites.has(key)) {
         const error = new Error('duplicate') as Error & { code?: number };
@@ -50,7 +50,7 @@ vi.mock('../models/RedeemedVoucher', () => ({
 }));
 vi.mock('../models/Voucher', () => ({
   Voucher: {
-    exists: vi.fn(async (query: any) => {
+    exists: vi.fn(async (query: { _id: unknown }) => {
     const known = ['507f1f77bcf86cd799439012'];
     return known.includes(String(query._id)) ? { _id: query._id } : null;
     }),
@@ -67,10 +67,10 @@ describe('user routes', () => {
   it.each([
     ['post', '/api/users/me/favorites/507f1f77bcf86cd799439012'],
     ['delete', '/api/users/me/favorites/507f1f77bcf86cd799439012'],
-  ])('rejects business mutation %s %s', async (method, path) => {
+  ] as const)('rejects business mutation %s %s', async (method, path) => {
     const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
 
-    await (request(createApp()) as any)[method](path)
+    await request(createApp())[method](path)
       .set('Cookie', [`auth_token=${businessToken}`])
       .send({})
       .expect(403);

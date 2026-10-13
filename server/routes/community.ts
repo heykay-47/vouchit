@@ -4,11 +4,11 @@ import { z } from 'zod';
 import { connectDb } from '../lib/db.js';
 import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
-import { Activity } from '../models/Activity.js';
-import { Notification } from '../models/Notification.js';
+import { Activity, type ActivityDocument } from '../models/Activity.js';
+import { Notification, type NotificationDocument } from '../models/Notification.js';
 import { User } from '../models/User.js';
 import { Voucher } from '../models/Voucher.js';
-import { VoucherRequest } from '../models/VoucherRequest.js';
+import { VoucherRequest, type VoucherRequestDocument } from '../models/VoucherRequest.js';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ const listQuerySchema = z.object({
   unreadOnly: z.coerce.boolean().optional().default(false),
 });
 
-const toRequestResponse = (request: any, username = 'Anonymous') => ({
+const toRequestResponse = (request: VoucherRequestDocument, username = 'Anonymous') => ({
   id: request._id.toString(),
   userId: request.userId.toString(),
   username,
@@ -30,7 +30,9 @@ const toRequestResponse = (request: any, username = 'Anonymous') => ({
   createdAt: request.createdAt,
 });
 
-const toNotificationResponse = (notification: any) => ({
+const toNotificationResponse = (notification: NotificationDocument & {
+  relatedVoucherId?: mongoose.Types.ObjectId | null;
+}) => ({
   id: notification._id.toString(),
   userId: notification.userId.toString(),
   type: notification.type,
@@ -41,7 +43,7 @@ const toNotificationResponse = (notification: any) => ({
   createdAt: notification.createdAt,
 });
 
-const toActivityResponse = (activity: any, username = 'Anonymous') => ({
+const toActivityResponse = (activity: ActivityDocument, username = 'Anonymous') => ({
   id: activity._id.toString(),
   userId: activity.userId.toString(),
   username,
@@ -61,11 +63,11 @@ router.get('/requests', asyncRoute(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(offset)
     .limit(limit);
-  const users = await User.find({ _id: { $in: requests.map((request: any) => request.userId) } });
-  const names = new Map<string, string>(users.map((user: any) => [user._id.toString(), user.username]));
+  const users = await User.find({ _id: { $in: requests.map((request) => request.userId) } });
+  const names = new Map<string, string>(users.map((user) => [user._id.toString(), user.username]));
 
   ok(res, {
-    requests: requests.map((request: any) => toRequestResponse(request, names.get(request.userId.toString()))),
+    requests: requests.map((request) => toRequestResponse(request, names.get(request.userId.toString()))),
   });
 }));
 
@@ -113,7 +115,11 @@ router.patch('/notifications/:id/read', requireAuth, asyncRoute(async (req, res)
 
 router.get('/leaderboard', asyncRoute(async (_req, res) => {
   await connectDb();
-  const rows = await Voucher.aggregate([
+  const rows = await Voucher.aggregate<{
+    _id: mongoose.Types.ObjectId;
+    donationCount: number;
+    totalDonated: number;
+  }>([
     {
       $match: {
         isActive: true,
@@ -125,11 +131,11 @@ router.get('/leaderboard', asyncRoute(async (_req, res) => {
     { $sort: { donationCount: -1 } },
     { $limit: 10 },
   ]);
-  const users = await User.find({ _id: { $in: rows.map((row: any) => row._id) } });
-  const byId = new Map<string, any>(users.map((user: any) => [user._id.toString(), user]));
+  const users = await User.find({ _id: { $in: rows.map((row) => row._id) } });
+  const byId = new Map(users.map((user) => [user._id.toString(), user]));
 
   ok(res, {
-    contributors: rows.map((row: any) => {
+    contributors: rows.map((row) => {
       const user = byId.get(row._id.toString());
       return {
         id: row._id.toString(),
@@ -150,10 +156,10 @@ router.get('/activities', asyncRoute(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(offset)
     .limit(limit);
-  const users = await User.find({ _id: { $in: activities.map((activity: any) => activity.userId) } });
-  const names = new Map<string, string>(users.map((user: any) => [user._id.toString(), user.username]));
+  const users = await User.find({ _id: { $in: activities.map((activity) => activity.userId) } });
+  const names = new Map<string, string>(users.map((user) => [user._id.toString(), user.username]));
   ok(res, {
-    activities: activities.map((activity: any) => toActivityResponse(activity, names.get(activity.userId.toString()))),
+    activities: activities.map((activity) => toActivityResponse(activity, names.get(activity.userId.toString()))),
   });
 }));
 

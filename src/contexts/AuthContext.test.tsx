@@ -5,8 +5,10 @@ import type { AuthContextType, User } from '@/lib/types';
 import { offersQueryKey, useOffersQuery } from '@/hooks/useOffersQuery';
 import { vouchersQueryKey } from '@/hooks/useVouchersQuery';
 import { ApiClientError } from '@/services/api-client';
-import { AuthProvider, useAuth } from './AuthContext';
-import { VoucherProvider, useVouchers } from './VoucherContext';
+import { useAuth } from './AuthContext';
+import { AuthProvider } from './AuthProvider';
+import { useVouchers } from './VoucherContext';
+import { VoucherProvider } from './VoucherProvider';
 
 const authServiceMocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),

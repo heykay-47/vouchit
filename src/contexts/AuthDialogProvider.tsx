@@ -1,20 +1,7 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import AuthModal from '@/components/AuthModal';
 import type { User, UserRole } from '@/lib/types';
-
-export type AuthDialogMode = 'login' | 'signup';
-
-export interface AuthDialogContextValue {
-  openLogin: (returnFocus?: HTMLElement | null, onAuthenticated?: (user: User) => void) => void;
-  openSignup: (
-    returnFocus?: HTMLElement | null,
-    onAuthenticated?: (user: User) => void,
-    initialRole?: UserRole,
-  ) => void;
-  closeAuth: () => void;
-}
-
-const AuthDialogContext = createContext<AuthDialogContextValue | null>(null);
+import { AuthDialogContext, type AuthDialogMode } from './AuthDialogContext';
 
 export function AuthDialogProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<AuthDialogMode>('login');
@@ -77,10 +64,4 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
       />
     </AuthDialogContext.Provider>
   );
-}
-
-export function useAuthDialog() {
-  const value = useContext(AuthDialogContext);
-  if (!value) throw new Error('useAuthDialog must be used within AuthDialogProvider');
-  return value;
 }

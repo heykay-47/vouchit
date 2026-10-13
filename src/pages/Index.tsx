@@ -4,19 +4,11 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthDialog } from '@/contexts/AuthDialogContext';
 import { useVouchers } from '@/contexts/VoucherContext';
-import type { Voucher } from '@/lib/types';
+import { getAvailableVoucherCount } from '@/utils/voucher-utils';
 import LandingNav from '@/components/landing/LandingNav';
 import ExchangeBoard from '@/components/landing/ExchangeBoard';
 import ExchangeWalkthrough from '@/components/landing/ExchangeWalkthrough';
 import TrustStrip from '@/components/landing/TrustStrip';
-
-export function getAvailableVoucherCount(vouchers: Voucher[], now = new Date()) {
-  return vouchers.filter((voucher) => (
-    voucher.isActive &&
-    !voucher.isRedeemed &&
-    (!voucher.expiryDate || new Date(voucher.expiryDate) >= now)
-  )).length;
-}
 
 export default function Index() {
   const { isAuthenticated } = useAuth();

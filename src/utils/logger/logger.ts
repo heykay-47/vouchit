@@ -14,7 +14,7 @@ export const createLogger = (customConfig?: LoggerConfig): Logger => {
   const config = mergeConfig(getConfig(), customConfig);
   let globalContext: Partial<LogContext> = config.context || {};
 
-  const log = (level: LogLevelString, message: string, errorOrData?: Error | unknown, data?: Record<string, any>) => {
+  const log = (level: LogLevelString, message: string, errorOrData?: unknown, data?: Record<string, unknown>) => {
     if (!config.enabled) return;
 
     const currentLevel = LogLevelMap[level];
@@ -22,7 +22,7 @@ export const createLogger = (customConfig?: LoggerConfig): Logger => {
     if (currentLevel < minLevel) return;
 
     let error: Error | unknown | undefined = errorOrData;
-    let logData: Record<string, any> | undefined = data;
+    let logData: Record<string, unknown> | undefined = data;
 
     if (!(errorOrData instanceof Error) && typeof errorOrData === 'object' && errorOrData !== null) {
       logData = { ...errorOrData, ...data };
@@ -34,7 +34,7 @@ export const createLogger = (customConfig?: LoggerConfig): Logger => {
         if(errorOrData instanceof Error) {
             error = errorOrData
         } else {
-            logData = errorOrData as Record<string, any>
+            logData = errorOrData as Record<string, unknown>
             error = undefined
         }
     }
@@ -58,6 +58,7 @@ export const createLogger = (customConfig?: LoggerConfig): Logger => {
           transport.send(entry, config);
         }
       } catch (e) {
+        // eslint-disable-next-line no-console -- A failed logger transport cannot report its own failure.
         console.error('Error in logger transport:', e);
       }
     });

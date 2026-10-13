@@ -106,7 +106,7 @@ export default function BusinessDashboard() {
                   <Link
                     key={invoice.id}
                     to={`/business/campaigns/${invoice.campaignId}`}
-                    className="flex min-h-11 flex-col gap-1 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between"
+                    className="flex min-h-11 flex-col gap-1 rounded-lg border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between"
                   >
                     <span className="break-all text-sm">invoice {invoice.id}</span>
                     <span className="text-sm text-muted-foreground">

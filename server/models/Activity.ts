@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const activitySchema = new Schema(
   {
@@ -14,5 +14,7 @@ const activitySchema = new Schema(
 
 activitySchema.index({ createdAt: -1 });
 
-export const Activity: mongoose.Model<any> =
-  (mongoose.models.Activity as mongoose.Model<any>) || mongoose.model('Activity', activitySchema);
+export type ActivityDocument = InferSchemaType<typeof activitySchema> & { _id: mongoose.Types.ObjectId };
+export const Activity: mongoose.Model<ActivityDocument> =
+  (mongoose.models.Activity as mongoose.Model<ActivityDocument>) ||
+  mongoose.model<ActivityDocument>('Activity', activitySchema);

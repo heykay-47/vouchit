@@ -31,7 +31,6 @@ vi.mock('./components/Sidebar', () => ({
 }));
 
 vi.mock('./contexts/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
   useAuth: () => ({
     user: authState.user,
     isLoading: authState.isLoading,
@@ -39,7 +38,11 @@ vi.mock('./contexts/AuthContext', () => ({
   }),
 }));
 
-vi.mock('./contexts/VoucherContext', () => ({
+vi.mock('./contexts/AuthProvider', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock('./contexts/VoucherProvider', () => ({
   VoucherProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 

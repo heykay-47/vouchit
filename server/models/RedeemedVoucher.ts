@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const redeemedVoucherSchema = new Schema(
   {
@@ -19,5 +19,7 @@ redeemedVoucherSchema.index(
   },
 );
 
-export const RedeemedVoucher: mongoose.Model<any> =
-  (mongoose.models.RedeemedVoucher as mongoose.Model<any>) || mongoose.model('RedeemedVoucher', redeemedVoucherSchema);
+export type RedeemedVoucherDocument = InferSchemaType<typeof redeemedVoucherSchema> & { _id: mongoose.Types.ObjectId };
+export const RedeemedVoucher: mongoose.Model<RedeemedVoucherDocument> =
+  (mongoose.models.RedeemedVoucher as mongoose.Model<RedeemedVoucherDocument>) ||
+  mongoose.model<RedeemedVoucherDocument>('RedeemedVoucher', redeemedVoucherSchema);

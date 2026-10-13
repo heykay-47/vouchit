@@ -17,6 +17,9 @@ All notable changes to VouchIt are documented here.
 
 ### Fixed
 
+- Updated vulnerable runtime, build, and test dependencies; removed the obsolete esbuild override and unused typography plugin.
+- Preserved semantic themes and accessible focus rings while migrating to Tailwind CSS 4 and its PostCSS plugin.
+- Removed lint warnings with schema-derived model types, typed fixtures, unused-code cleanup, and separate Fast Refresh component modules; lint now fails on warnings.
 - Stopped the demo seed from printing passwords and guarded database execution so fixture builders can be imported safely in tests.
 - Updated the static Docker builder to Node 24 and clarified that Docker serves only the frontend while Vercel provides the end-to-end deployment.
 - Moved voucher browsing to `/browse` while keeping the landing page at `/`.

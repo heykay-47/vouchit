@@ -1,4 +1,4 @@
-import { Comment, Contributor, Notification, VoucherRequest } from '@/lib/types';
+import { Comment, Contributor, Notification, UserActivity, VoucherRequest } from '@/lib/types';
 import { apiRequest } from './api-client';
 
 export const communityService = {
@@ -41,7 +41,7 @@ export const communityService = {
   },
 
   async activities() {
-    const { activities } = await apiRequest<{ activities: any[] }>('/api/activities');
+    const { activities } = await apiRequest<{ activities: UserActivity[] }>('/api/activities');
     return activities.map((activity) => ({ ...activity, createdAt: new Date(activity.createdAt) }));
   },
 };

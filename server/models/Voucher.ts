@@ -77,5 +77,5 @@ voucherSchema.index({ campaignId: 1, sourceType: 1, isActive: 1, isRedeemed: 1, 
 voucherSchema.index({ campaignId: 1, redeemedBy: 1 });
 
 export type VoucherDocument = InferSchemaType<typeof voucherSchema> & { _id: mongoose.Types.ObjectId };
-export const Voucher: mongoose.Model<any> =
-  (mongoose.models.Voucher as mongoose.Model<any>) || mongoose.model('Voucher', voucherSchema);
+export const Voucher: mongoose.Model<VoucherDocument> =
+  (mongoose.models.Voucher as mongoose.Model<VoucherDocument>) || mongoose.model<VoucherDocument>('Voucher', voucherSchema);

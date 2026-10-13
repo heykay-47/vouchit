@@ -16,7 +16,7 @@ interface SocialShareProps {
   voucherTitle?: string;
 }
 
-export default function SocialShare({ voucherId, voucherTitle }: SocialShareProps) {
+export default function SocialShare({ voucherTitle }: SocialShareProps) {
   const [copied, setCopied] = useState(false);
   
   // Create the base URL for sharing

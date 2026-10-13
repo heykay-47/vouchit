@@ -1,5 +1,4 @@
 
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Voucher } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -19,8 +18,7 @@ import {
   Tag, 
   AlertTriangle,
   User,
-  Copy,
-  CheckCircle
+  Copy
 } from 'lucide-react';
 import { toast } from '@/utils/toast';
 import { logger } from '@/utils/logger';
@@ -35,7 +33,6 @@ interface VoucherDetailProps {
 
 export default function VoucherDetail({ voucher, onRedeem, onReport }: VoucherDetailProps) {
   const { user } = useAuth();
-  const [copied, setCopied] = useState(false);
   
   const copyCode = () => {
     if (!voucher.code) {
@@ -127,17 +124,8 @@ export default function VoucherDetail({ voucher, onRedeem, onReport }: VoucherDe
                 onClick={copyCode}
                 className="flex items-center gap-1"
               >
-                {copied ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-green-500">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    <span>Copy</span>
-                  </>
-                )}
+                <Copy className="h-4 w-4" />
+                <span>Copy</span>
               </Button>
             </div>
           ) : (

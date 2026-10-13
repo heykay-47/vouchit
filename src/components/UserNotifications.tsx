@@ -1,11 +1,8 @@
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationService, InterestCategories } from '@/hooks/useNotificationService';
-import { Notification as NotificationType } from '@/lib/types';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   CardFooter
@@ -27,13 +24,11 @@ import { toast } from '@/utils/toast';
 import { logger } from '@/utils/logger';
 
 export default function UserNotifications() {
-  const { user } = useAuth();
   const [interests, setInterests] = useState<InterestCategories>(['all']);
 
   const {
     notifications,
-    isLoading,
-    error
+    isLoading
   } = useNotificationService(interests);
 
   const markAsRead = async (notificationId: string) => {

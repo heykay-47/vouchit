@@ -1,5 +1,5 @@
 
-import { User, Voucher } from '@/lib/types';
+import { User } from '@/lib/types';
 import { useVouchers } from '@/contexts/VoucherContext';
 import { 
   BarChart,
@@ -24,12 +24,11 @@ import {
   Gift, 
   Clock, 
   Check, 
-  AlertTriangle,
   Trophy,
   AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { format, addDays, startOfMonth, endOfMonth } from 'date-fns';
+import { addDays } from 'date-fns';
 
 interface UserStatisticsProps {
   user: User | null;

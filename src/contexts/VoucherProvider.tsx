@@ -1,11 +1,11 @@
-import React, { createContext, useContext, useMemo, useCallback, useEffect, useState } from 'react'
-import { Voucher, VoucherContextType } from '@/lib/types'
+import React, { useMemo, useCallback, useEffect, useState } from 'react'
+import { Voucher } from '@/lib/types'
+import { VoucherContext } from './VoucherContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useVoucherOperations } from '@/hooks/useVoucherOperations'
 import { useVouchersQuery } from '@/hooks/useVouchersQuery'
 import { sortVouchers as sortVouchersUtil, searchVouchers as searchVouchersUtil } from '@/utils/voucher-utils'
 
-const VoucherContext = createContext<VoucherContextType | undefined>(undefined)
 const emptyVouchers: Voucher[] = []
 
 export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -81,12 +81,4 @@ export const VoucherProvider: React.FC<{ children: React.ReactNode }> = ({ child
       {children}
     </VoucherContext.Provider>
   )
-}
-
-export const useVouchers = () => {
-  const context = useContext(VoucherContext)
-  if (context === undefined) {
-    throw new Error('useVouchers must be used within a VoucherProvider')
-  }
-  return context
 }

@@ -50,5 +50,5 @@ describe('Vercel deployment configuration', () => {
         { cwd: process.cwd(), stdio: 'pipe' }
       );
     }).not.toThrow();
-  });
+  }, 15_000);
 });

@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const reportedVoucherSchema = new Schema(
   {
@@ -11,5 +11,7 @@ const reportedVoucherSchema = new Schema(
 
 reportedVoucherSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
-export const ReportedVoucher: mongoose.Model<any> =
-  (mongoose.models.ReportedVoucher as mongoose.Model<any>) || mongoose.model('ReportedVoucher', reportedVoucherSchema);
+export type ReportedVoucherDocument = InferSchemaType<typeof reportedVoucherSchema> & { _id: mongoose.Types.ObjectId };
+export const ReportedVoucher: mongoose.Model<ReportedVoucherDocument> =
+  (mongoose.models.ReportedVoucher as mongoose.Model<ReportedVoucherDocument>) ||
+  mongoose.model<ReportedVoucherDocument>('ReportedVoucher', reportedVoucherSchema);

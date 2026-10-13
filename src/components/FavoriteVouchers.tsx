@@ -8,10 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heart, BookmarkPlus, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { toast } from '@/utils/toast';
 
 export default function FavoriteVouchers() {
-  const { user, toggleFavorite } = useAuth();
+  const { user } = useAuth();
   const { vouchers } = useVouchers();
   const navigate = useNavigate();
   const [favoriteVouchers, setFavoriteVouchers] = useState<Voucher[]>([]);

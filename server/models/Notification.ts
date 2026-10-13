@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const notificationSchema = new Schema(
   {
@@ -14,5 +14,7 @@ const notificationSchema = new Schema(
 
 notificationSchema.index({ userId: 1, createdAt: -1 });
 
-export const Notification: mongoose.Model<any> =
-  (mongoose.models.Notification as mongoose.Model<any>) || mongoose.model('Notification', notificationSchema);
+export type NotificationDocument = InferSchemaType<typeof notificationSchema> & { _id: mongoose.Types.ObjectId };
+export const Notification: mongoose.Model<NotificationDocument> =
+  (mongoose.models.Notification as mongoose.Model<NotificationDocument>) ||
+  mongoose.model<NotificationDocument>('Notification', notificationSchema);

@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const favoriteSchema = new Schema(
   {
@@ -10,5 +10,7 @@ const favoriteSchema = new Schema(
 
 favoriteSchema.index({ userId: 1, voucherId: 1 }, { unique: true });
 
-export const Favorite: mongoose.Model<any> =
-  (mongoose.models.Favorite as mongoose.Model<any>) || mongoose.model('Favorite', favoriteSchema);
+export type FavoriteDocument = InferSchemaType<typeof favoriteSchema> & { _id: mongoose.Types.ObjectId };
+export const Favorite: mongoose.Model<FavoriteDocument> =
+  (mongoose.models.Favorite as mongoose.Model<FavoriteDocument>) ||
+  mongoose.model<FavoriteDocument>('Favorite', favoriteSchema);

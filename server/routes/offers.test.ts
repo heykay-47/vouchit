@@ -36,6 +36,8 @@ const offerState = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
 }));
 
+const createRedemption = vi.hoisted(() => vi.fn(async (documents: unknown[]) => documents));
+
 const claimState = vi.hoisted(() => {
   const sameId = (left: unknown, right: unknown) => left?.toString() === right?.toString();
   const matches = (document: TestDocument, filter: TestFilter): boolean => (
@@ -227,7 +229,7 @@ vi.mock('../models/BusinessProfile', () => ({
 
 vi.mock('../models/RedeemedVoucher', () => ({
   RedeemedVoucher: {
-    create: vi.fn(async (documents: unknown[]) => documents),
+    create: createRedemption,
   },
 }));
 
@@ -256,7 +258,7 @@ describe('offer routes', () => {
     claimState.vouchers.length = 0;
     claimState.priorClaimBarrier = null;
     claimState.sessionSequence = 0;
-    vi.mocked(RedeemedVoucher.create).mockImplementation(async (documents) => documents);
+    createRedemption.mockImplementation(async (documents) => documents);
   });
 
   it('returns community vouchers and one grouped campaign offer without secrets', async () => {
@@ -462,7 +464,7 @@ describe('offer routes', () => {
   it('rolls back inventory and does not expose a code when redemption history fails', async () => {
     claimState.campaigns.push(makeCampaign());
     claimState.vouchers.push(makeCampaignVoucher());
-    vi.mocked(RedeemedVoucher.create).mockRejectedValueOnce(new Error('history unavailable'));
+    createRedemption.mockRejectedValueOnce(new Error('history unavailable'));
     const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const response = await claim(campaignId, customerToken).expect(500);
@@ -491,7 +493,7 @@ describe('offer routes', () => {
     let releaseFirstHistory!: () => void;
     const secondHistoryStarted = new Promise<void>((resolve) => { releaseFirstHistory = resolve; });
     let historyCalls = 0;
-    vi.mocked(RedeemedVoucher.create).mockImplementation(async () => {
+    createRedemption.mockImplementation(async () => {
       historyCalls += 1;
       if (historyCalls === 1) {
         await secondHistoryStarted;

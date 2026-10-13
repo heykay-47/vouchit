@@ -5,9 +5,20 @@ import { BusinessProfile } from '../models/BusinessProfile.js';
 import { signAuthToken } from '../lib/token.js';
 import { User } from '../models/User.js';
 
-const users = new Map<string, any>();
-const favorites: any[] = [];
-const redeemedVouchers: any[] = [];
+type TestUser = {
+  _id: { toString(): string };
+  email: string;
+  username: string;
+  passwordHash: string;
+  createdAt: Date;
+  role?: string;
+};
+type UserInput = Pick<TestUser, 'email' | 'username' | 'passwordHash' | 'role'>;
+type VoucherReference = { userId: string; voucherId: { toString(): string } };
+
+const users = new Map<string, TestUser>();
+const favorites: VoucherReference[] = [];
+const redeemedVouchers: VoucherReference[] = [];
 const transactionSession = {};
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
@@ -16,14 +27,14 @@ vi.mock('../lib/transaction', () => ({
 }));
 vi.mock('../models/User', () => ({
   User: {
-    findOne: vi.fn(async (query: any) => {
+    findOne: vi.fn(async (query: { email?: string }) => {
       if (query.email) return users.get(query.email) ?? null;
       return null;
     }),
     findById: vi.fn(async (id: string) => {
       return Array.from(users.values()).find((user) => user._id.toString() === id) ?? null;
     }),
-    create: vi.fn(async (docs: any, _options?: { session?: object }) => {
+    create: vi.fn(async (docs: UserInput | UserInput[], _options?: { session?: object }) => {
       const doc = Array.isArray(docs) ? docs[0] : docs;
       const user = {
         _id: { toString: () => '507f1f77bcf86cd799439011' },
@@ -34,9 +45,10 @@ vi.mock('../models/User', () => ({
       return Array.isArray(docs) ? [user] : user;
     }),
   },
-}));vi.mock('../models/Favorite', () => ({
+}));
+vi.mock('../models/Favorite', () => ({
   Favorite: {
-    find: vi.fn(async (query: any) => favorites.filter((favorite) => favorite.userId === query.userId)),
+    find: vi.fn(async (query: { userId: string }) => favorites.filter((favorite) => favorite.userId === query.userId)),
   },
 }));
 vi.mock('../models/BusinessProfile', () => ({
@@ -73,7 +85,7 @@ const authenticatedRequest = () => request(createApp())
   .set('Cookie', `auth_token=${signAuthToken({ userId: '507f1f77bcf86cd799439011' }, '12h')}`);
 vi.mock('../models/RedeemedVoucher', () => ({
   RedeemedVoucher: {
-    find: vi.fn(async (query: any) => redeemedVouchers.filter((redeemed) => redeemed.userId === query.userId)),
+    find: vi.fn(async (query: { userId: string }) => redeemedVouchers.filter((redeemed) => redeemed.userId === query.userId)),
   },
 }));
 

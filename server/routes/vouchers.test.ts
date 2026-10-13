@@ -1,4 +1,5 @@
 import request from 'supertest';
+import type { RequestHandler } from 'express';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../app.js';
 import { signAuthToken } from '../lib/token.js';
@@ -7,10 +8,17 @@ import { Campaign } from '../models/Campaign.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
 import { Voucher } from '../models/Voucher.js';
 
-const vouchers: any[] = [];
-const comments: any[] = [];
-const campaigns: any[] = [];
-const profiles: any[] = [];
+type TestDocument = Record<string, unknown> & { _id: { toString(): string } };
+type TestFilter = Record<string, unknown>;
+type TestUpdate = Record<string, unknown> & {
+  $inc?: Record<string, number>;
+  $set?: Record<string, unknown>;
+};
+
+const vouchers: TestDocument[] = [];
+const comments: TestDocument[] = [];
+const campaigns: TestDocument[] = [];
+const profiles: TestDocument[] = [];
 process.env.JWT_SECRET = 'test-secret';
 const customerId = '507f1f77bcf86cd799439022';
 const testNow = new Date('2026-08-23T12:00:00.000Z');
@@ -31,18 +39,19 @@ const makeVoucher = (overrides: Record<string, unknown> = {}) => {
   };
 };
 
-const sameId = (left: any, right: any) => left?.toString?.() === right?.toString?.();
-const matchesFilter = (document: any, filter: any): boolean => Object.entries(filter).every(([key, value]) => {
-  if (key === '$or') return (value as any[]).some((condition) => matchesFilter(document, condition));
-  if (key === '$and') return (value as any[]).every((condition) => matchesFilter(document, condition));
+const sameId = (left: unknown, right: unknown) => left?.toString() === right?.toString();
+const matchesFilter = (document: TestDocument, filter: TestFilter): boolean => Object.entries(filter).every(([key, value]) => {
+  if (key === '$or') return (value as TestFilter[]).some((condition) => matchesFilter(document, condition));
+  if (key === '$and') return (value as TestFilter[]).every((condition) => matchesFilter(document, condition));
   if (value && typeof value === 'object' && '$exists' in value) {
     return value.$exists ? document[key] !== undefined : document[key] === undefined;
   }
   if (value && typeof value === 'object' && '$gt' in value) {
-    return document[key] != null && document[key] > value.$gt;
+    const date = document[key];
+    return date instanceof Date && value.$gt instanceof Date && date > value.$gt;
   }
   if (value && typeof value === 'object' && '$in' in value) {
-    return (value.$in as any[]).some((candidate: any) => sameId(document[key], candidate));
+    return (value.$in as unknown[]).some((candidate) => sameId(document[key], candidate));
   }
   if (value && typeof value === 'object' && '$ne' in value) return !sameId(document[key], value.$ne);
   if (value === null) return document[key] == null;
@@ -50,10 +59,10 @@ const matchesFilter = (document: any, filter: any): boolean => Object.entries(fi
 });
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
-vi.mock('express-rate-limit', () => ({ default: () => (_req: any, _res: any, next: any) => next() }));
+vi.mock('express-rate-limit', () => ({ default: (): RequestHandler => (_req, _res, next) => next() }));
 vi.mock('../models/Activity', () => ({ Activity: { create: vi.fn(async () => ({})) } }));
 vi.mock('../models/Voucher', () => {
-  let query: any = {};
+  let query: TestFilter = {};
   const chain = {
     sort: voucherSort,
     skip: () => chain,
@@ -63,16 +72,16 @@ vi.mock('../models/Voucher', () => {
   voucherSort.mockImplementation(() => chain);
   return {
     Voucher: {
-      find: vi.fn((filter: any) => {
+      find: vi.fn((filter: TestFilter) => {
         query = filter;
         return chain;
       }),
-      exists: vi.fn(async (filter: any) => vouchers.some((voucher) => (
+      exists: vi.fn(async (filter: TestFilter) => vouchers.some((voucher) => (
         voucher.campaignId?.toString() === filter.campaignId?.toString()
         && voucher.sourceType === filter.sourceType
         && voucher.isRedeemed === filter.isRedeemed
       ))),
-      create: vi.fn(async (doc: any) => {
+      create: vi.fn(async (doc: Record<string, unknown>) => {
         const voucher = {
           _id: { toString: () => '507f1f77bcf86cd799439012' },
           ...doc,
@@ -85,19 +94,19 @@ vi.mock('../models/Voucher', () => {
         return voucher;
       }),
       findById: vi.fn(async (id: string) => vouchers.find((voucher) => voucher._id.toString() === id) ?? null),
-      findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
+      findOneAndUpdate: vi.fn(async (filter: TestFilter, update: TestUpdate) => {
         const voucher = vouchers.find((item) => matchesFilter(item, filter));
         if (!voucher) return null;
         Object.assign(voucher, update);
         if (update.$inc) {
           Object.entries(update.$inc).forEach(([key, value]) => {
-            voucher[key] = (voucher[key] ?? 0) + (value as number);
+            voucher[key] = (typeof voucher[key] === 'number' ? voucher[key] : 0) + value;
           });
           delete voucher.$inc;
         }
         return voucher;
       }),
-      findByIdAndUpdate: vi.fn(async (id: string, update: any) => {
+      findByIdAndUpdate: vi.fn(async (id: string, update: TestUpdate) => {
         const voucher = vouchers.find((voucher) => voucher._id.toString() === id);
         if (voucher) Object.assign(voucher, update);
         return voucher ?? null;
@@ -107,14 +116,14 @@ vi.mock('../models/Voucher', () => {
 });
 vi.mock('../models/Campaign', () => ({
   Campaign: {
-    find: vi.fn((filter: any) => {
+    find: vi.fn((filter: TestFilter) => {
       const chain = {
         select: () => chain,
         lean: async () => campaigns.filter((campaign) => matchesFilter(campaign, filter)),
       };
       return chain;
     }),
-    findOneAndUpdate: vi.fn(async (filter: any, update: any) => {
+    findOneAndUpdate: vi.fn(async (filter: TestFilter, update: TestUpdate) => {
       const campaign = campaigns.find((item) => item._id.toString() === filter._id.toString()
         && item.status === filter.status);
       if (campaign) Object.assign(campaign, update.$set ?? update);
@@ -135,7 +144,7 @@ vi.mock('../models/Comment', () => {
   return {
     Comment: {
       find: vi.fn(() => chain),
-      create: vi.fn(async (doc: any) => {
+      create: vi.fn(async (doc: Record<string, unknown>) => {
         const comment = {
           _id: { toString: () => '507f1f77bcf86cd799439030' },
           ...doc,
@@ -200,10 +209,10 @@ describe('voucher routes', () => {
     ['post', '/api/vouchers/507f1f77bcf86cd799439012/redeem'],
     ['post', '/api/vouchers/507f1f77bcf86cd799439012/report'],
     ['post', '/api/vouchers/507f1f77bcf86cd799439012/comments'],
-  ])('rejects business mutation %s %s', async (method, path) => {
+  ])('rejects business mutation %s %s', async (_method, path) => {
     const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
 
-    await (request(createApp()) as any)[method](path)
+    await request(createApp()).post(path)
       .set('Cookie', [`auth_token=${businessToken}`])
       .send(validBodyFor(path))
       .expect(403);
@@ -469,12 +478,15 @@ describe('voucher routes', () => {
 
     expect(res.body.data.vouchers).toHaveLength(1);
     expect(res.body.data.vouchers[0].id).toBe('507f1f77bcf86cd799439016');
-    const query = (Voucher.find as any).mock.calls[0][0] as any;
-    expect(query).toEqual(expect.objectContaining({ $or: expect.any(Array) }));
-    expect(query.$and[0].$or).toEqual(expect.arrayContaining([
-      { sourceType: 'community' },
-      { sourceType: { $exists: false } },
-    ]));
+    expect(Voucher.find).toHaveBeenCalledWith(expect.objectContaining({
+      $or: expect.any(Array),
+      $and: [{
+        $or: expect.arrayContaining([
+          { sourceType: 'community' },
+          { sourceType: { $exists: false } },
+        ]),
+      }],
+    }));
   });
 
   it('does not expose the obsolete inventory voucher view endpoint', async () => {
@@ -654,7 +666,7 @@ describe('voucher routes', () => {
       .expect(409);
 
     expect(vouchers[0].isRedeemed).toBe(false);
-    const filter = vi.mocked(Voucher.findOneAndUpdate).mock.calls[0][0] as any;
+    const filter = vi.mocked(Voucher.findOneAndUpdate).mock.calls[0][0];
     expect(filter).toEqual({
       $and: [
         { _id: '507f1f77bcf86cd799439012' },
@@ -700,7 +712,7 @@ describe('voucher routes', () => {
   });
 
   it('keeps the voucher claim successful when the redemption history side write fails', async () => {
-    const voucher: any = {
+    const voucher: TestDocument = {
       _id: { toString: () => '507f1f77bcf86cd799439012' },
       code: 'SIDE-WRITE',
       donatedBy: '507f1f77bcf86cd799439011',

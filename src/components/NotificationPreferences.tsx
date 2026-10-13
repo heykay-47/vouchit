@@ -1,6 +1,4 @@
 
-import { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationService, InterestCategories } from '@/hooks/useNotificationService';
 import {
   Card,
@@ -13,7 +11,6 @@ import { Switch } from '@/components/ui/switch';
 import { VoucherCategory } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Bell, BellOff, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { toast } from '@/utils/toast';
 
 interface NotificationPreferencesProps {
@@ -25,7 +22,6 @@ export default function NotificationPreferences({
   interests = ['all'],
   onUpdateInterests
 }: NotificationPreferencesProps) {
-  const { user } = useAuth();
   const { 
     isEnabled, 
     toggleNotifications, 

@@ -23,7 +23,7 @@ export default function CampaignList({ campaigns }: CampaignListProps) {
             <Link
               key={campaign.id}
               to={`/business/campaigns/${campaign.id}`}
-              className="block rounded-lg border border-border bg-card p-5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="block rounded-lg border border-border bg-card p-5 transition-colors hover:bg-muted/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">

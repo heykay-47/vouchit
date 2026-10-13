@@ -1,6 +1,14 @@
 
 import { Voucher } from '@/lib/types';
 
+export function getAvailableVoucherCount(vouchers: Voucher[], now = new Date()) {
+  return vouchers.filter((voucher) => (
+    voucher.isActive &&
+    !voucher.isRedeemed &&
+    (!voucher.expiryDate || new Date(voucher.expiryDate) >= now)
+  )).length;
+}
+
 // Advanced sorting function
 export const sortVouchers = (vouchers: Voucher[], sortBy: 'newest' | 'expirySoon' | 'highestValue'): Voucher[] => {
   const sorted = [...vouchers];

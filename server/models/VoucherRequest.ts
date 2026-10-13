@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const voucherRequestSchema = new Schema(
   {
@@ -14,5 +14,7 @@ const voucherRequestSchema = new Schema(
 
 voucherRequestSchema.index({ createdAt: -1 });
 
-export const VoucherRequest: mongoose.Model<any> =
-  (mongoose.models.VoucherRequest as mongoose.Model<any>) || mongoose.model('VoucherRequest', voucherRequestSchema);
+export type VoucherRequestDocument = InferSchemaType<typeof voucherRequestSchema> & { _id: mongoose.Types.ObjectId };
+export const VoucherRequest: mongoose.Model<VoucherRequestDocument> =
+  (mongoose.models.VoucherRequest as mongoose.Model<VoucherRequestDocument>) ||
+  mongoose.model<VoucherRequestDocument>('VoucherRequest', voucherRequestSchema);

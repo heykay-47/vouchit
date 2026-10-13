@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import type { AuthContextType, SignupInput, User as AppUser } from '@/lib/types';
 import { offersQueryKey } from '@/hooks/useOffersQuery';
@@ -13,10 +13,9 @@ import {
 import { ApiClientError, apiRequest } from '@/services/api-client';
 import { toast } from '@/utils/toast';
 import { createLogger } from '@/utils/logger';
+import { AuthContext } from './AuthContext';
 
 const logger = createLogger({ context: { component: 'AuthContext' } });
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -258,12 +257,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 };

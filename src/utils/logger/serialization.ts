@@ -15,7 +15,7 @@ export function serializeError(error: unknown): SerializedError {
       message: error.message,
       stack: error.stack,
       cause: 'cause' in error && error.cause ? serializeError(error.cause) : undefined,
-      code: (error as any).code,
+      code: 'code' in error ? error.code : undefined,
     };
   }
   
@@ -35,21 +35,21 @@ export function serializeError(error: unknown): SerializedError {
 /**
  * Remove sensitive data from logs
  */
-export function sanitizeData<T extends Record<string, any>>(data: T): T {
+export function sanitizeData<T extends Record<string, unknown>>(data: T): T {
   if (!data) return data;
 
   const sensitiveKeys = [
     'password', 'token', 'apiKey', 'secret', 'authorization', 'cookie', 'sessionId'
   ];
   
-  const sanitized: Record<string, any> = { ...data };
+  const sanitized: Record<string, unknown> = { ...data };
   
   for (const key of Object.keys(sanitized)) {
     const lowerKey = key.toLowerCase();
     if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
-      sanitized[key] = '[REDACTED]' as any;
+      sanitized[key] = '[REDACTED]';
     } else if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-      sanitized[key] = sanitizeData(sanitized[key]);
+      sanitized[key] = sanitizeData(sanitized[key] as Record<string, unknown>);
     }
   }
   

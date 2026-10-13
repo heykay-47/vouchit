@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { User } from '@/lib/types';
-import { AuthDialogProvider, useAuthDialog } from './AuthDialogContext';
+import { useAuthDialog } from './AuthDialogContext';
+import { AuthDialogProvider } from './AuthDialogProvider';
 
 vi.mock('@/components/AuthModal', () => ({
   default: ({

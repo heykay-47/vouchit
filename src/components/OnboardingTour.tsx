@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, X, Gift, Search, User } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Gift, Search, User } from 'lucide-react';
 
 interface OnboardingStep {
   title: string;

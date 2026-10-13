@@ -32,13 +32,15 @@ Use MongoDB Atlas M0 free tier for hosted data. In Atlas, allow Vercel's IPs to 
 
 ## Tech Stack
 
-- **Frontend**: React 18, TypeScript, Vite, React Query, React Router v6
-- **UI**: Tailwind CSS, shadcn-ui, Radix UI, Framer Motion, Recharts
+- **Frontend**: React 18, TypeScript, Vite 6, React Query, React Router v7
+- **UI**: Tailwind CSS 4, shadcn-ui, Radix UI, Framer Motion, Recharts
 - **Backend**: Vercel Serverless Functions with Express 4, Mongoose 8, Zod
 - **Database**: MongoDB Atlas
 - **Auth**: Email/password with bcryptjs + JWT httpOnly cookies
 - **Business inventory**: Papa Parse CSV parsing and preview validation in the browser
-- **Testing**: Vitest, Supertest
+- **Testing**: Vitest 4, Supertest
+
+Tailwind CSS 4 requires Safari 16.4+, Chrome 111+, or Firefox 128+. The existing theme tokens, class-based dark mode, and focus treatment remain in use.
 
 ## Product Model
 
@@ -122,7 +124,7 @@ VouchIt supports both sides of the marketplace without claiming that a payment p
 | `npm test` | Run tests (Vitest) |
 | `npm run test:watch` | Watch mode |
 | `npm run type-check` | TypeScript check |
-| `npm run lint` | ESLint |
+| `npm run lint` | ESLint; fails on any error or warning |
 | `npm run lint:fix` | ESLint with auto-fix |
 | `npm run clean` | Remove dist + cache |
 

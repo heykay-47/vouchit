@@ -5,7 +5,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Voucher } from '@/lib/types';
-import Index, { getAvailableVoucherCount } from './Index';
+import Index from './Index';
+import { getAvailableVoucherCount } from '@/utils/voucher-utils';
 
 const landingState = vi.hoisted(() => ({
   isAuthenticated: false,
@@ -58,7 +59,7 @@ vi.stubGlobal('IntersectionObserver', class {
 function renderLanding(overrides: Partial<typeof landingState> = {}) {
   Object.assign(landingState, overrides);
   return render(
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       <Index />
     </BrowserRouter>,
   );

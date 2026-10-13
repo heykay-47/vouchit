@@ -31,7 +31,7 @@ export interface LogContext {
   component?: string;
   page?: string;
   action?: string;
-  [key: string]: any;       // Allow custom fields
+  [key: string]: unknown;   // Allow custom fields
 }
 
 /**
@@ -40,7 +40,7 @@ export interface LogContext {
 export interface LogEntry {
   message: string;
   context: LogContext;
-  data?: Record<string, any>;  // Structured data
+  data?: Record<string, unknown>;  // Structured data
   error?: SerializedError;     // Error object (if applicable)
 }
 
@@ -51,8 +51,8 @@ export interface SerializedError {
   name: string;
   message: string;
   stack?: string;
-  cause?: any;
-  code?: string;           // Error code (if available)
+  cause?: SerializedError;
+  code?: unknown;          // Error code (if available)
 }
 
 /**
@@ -93,11 +93,11 @@ export interface Transport {
  * Logger instance interface
  */
 export interface Logger {
-  debug(message: string, data?: Record<string, any>): void;
-  info(message: string, data?: Record<string, any>): void;
-  warn(message: string, data?: Record<string, any>): void;
-  error(message: string, error?: Error | unknown, data?: Record<string, any>): void;
-  fatal(message: string, error?: Error | unknown, data?: Record<string, any>): void;
+  debug(message: string, data?: Record<string, unknown>): void;
+  info(message: string, data?: Record<string, unknown>): void;
+  warn(message: string, data?: Record<string, unknown>): void;
+  error(message: string, error?: unknown, data?: Record<string, unknown>): void;
+  fatal(message: string, error?: unknown, data?: Record<string, unknown>): void;
   
   // Context management
   setContext(context: Partial<LogContext>): void;

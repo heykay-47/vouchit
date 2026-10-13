@@ -1,7 +1,6 @@
 export default {
   plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
+    '@tailwindcss/postcss': {},
     // CSS optimization for production builds
     ...(process.env.NODE_ENV === 'production' && {
       cssnano: {

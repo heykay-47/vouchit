@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, type InferSchemaType } from 'mongoose';
 
 const commentSchema = new Schema(
   {
@@ -11,5 +11,7 @@ const commentSchema = new Schema(
 
 commentSchema.index({ voucherId: 1, createdAt: 1 });
 
-export const Comment: mongoose.Model<any> =
-  (mongoose.models.Comment as mongoose.Model<any>) || mongoose.model('Comment', commentSchema);
+export type CommentDocument = InferSchemaType<typeof commentSchema> & { _id: mongoose.Types.ObjectId };
+export const Comment: mongoose.Model<CommentDocument> =
+  (mongoose.models.Comment as mongoose.Model<CommentDocument>) ||
+  mongoose.model<CommentDocument>('Comment', commentSchema);

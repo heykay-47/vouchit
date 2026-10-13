@@ -5,11 +5,12 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { AuthDialogProvider } from "@/contexts/AuthDialogContext";
-import { VoucherProvider } from "./contexts/VoucherContext";
+import { useAuth } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthProvider";
+import { AuthDialogProvider } from "@/contexts/AuthDialogProvider";
+import { VoucherProvider } from "./contexts/VoucherProvider";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { lazy, Suspense, Component, ReactNode } from 'react';
+import { lazy, Suspense, Component, ReactNode, type ErrorInfo } from 'react';
 import LoadingScreen from "./components/LoadingScreen";
 import RoleRoute from "./components/RoleRoute";
 import Sidebar from "./components/Sidebar";
@@ -45,7 +46,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: any) {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     logger.fatal('Application Error', error, {
       component: 'AppErrorBoundary',
       errorInfo,

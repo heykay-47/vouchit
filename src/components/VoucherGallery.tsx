@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useVouchers } from '@/contexts/VoucherContext';
 import VoucherCard from './VoucherCard';
 import VoucherSkeleton from './VoucherSkeleton';
@@ -10,11 +10,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Voucher, VoucherPlatform } from '@/lib/types';
-import { Filter, Search, SortAsc, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { Filter, Search, SortAsc, Calendar, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '@/components/ui/button';
 import { useInView } from 'react-intersection-observer';
 
 interface VoucherGalleryProps {
@@ -38,8 +37,7 @@ export default function VoucherGallery({
   initialFilterStatus = 'all',
   showSearch = true,
   voucherList,
-  emptyMessage = "No vouchers found",
-  limit
+  emptyMessage = "No vouchers found"
 }: VoucherGalleryProps) {
   const { vouchers: contextVouchers, isLoading } = useVouchers();
   const vouchers = voucherList || contextVouchers;
@@ -53,7 +51,7 @@ export default function VoucherGallery({
   const [filteredVouchers, setFilteredVouchers] = useState<Voucher[]>([]);
   
   // Load more items when reaching the bottom of the list
-  const { ref, inView } = useInView({
+  const { inView } = useInView({
     threshold: 0.1,
     triggerOnce: false
   });
@@ -137,8 +135,6 @@ export default function VoucherGallery({
     return filteredVouchers.slice(0, currentPage * ITEMS_PER_PAGE);
   }, [filteredVouchers, currentPage]);
   
-  const hasMoreItems = displayedVouchers.length < filteredVouchers.length;
-
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);

@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import type { CampaignOffer, Voucher } from '@/lib/types';
-import { AuthDialogProvider } from '@/contexts/AuthDialogContext';
+import { AuthDialogProvider } from '@/contexts/AuthDialogProvider';
 import { CampaignOfferCard, CampaignOfferDialog } from './CampaignOfferCard';
 import Sidebar from './Sidebar';
 import VoucherCard from './VoucherCard';

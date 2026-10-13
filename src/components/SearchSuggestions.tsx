@@ -25,7 +25,6 @@ export default function SearchSuggestions({
   className = ''
 }: SearchSuggestionsProps) {
   const { vouchers, searchVouchers } = useVouchers();
-  const [results, setResults] = useState<Voucher[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -63,15 +62,13 @@ export default function SearchSuggestions({
   // Updates voucher search results as user types in search box
   useEffect(() => {
     if (query.trim() === '') {
-      setResults([]);
       setSuggestions([]);
       return;
     }
 
     // Search vouchers based on query
     if (searchVouchers) {
-      const searchResults = searchVouchers(query);
-      setResults(searchResults.slice(0, 5));
+      searchVouchers(query);
     }
 
     // Generate search suggestions

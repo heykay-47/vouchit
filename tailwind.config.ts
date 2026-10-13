@@ -19,6 +19,12 @@ export default {
 			}
 		},
 		extend: {
+			boxShadow: {
+				sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+			},
+			backdropBlur: {
+				sm: '4px',
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',

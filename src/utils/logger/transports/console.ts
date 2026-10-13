@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- This transport intentionally owns structured console output. */
 import { Transport, LogEntry, LoggerConfig, LogLevelString } from '../types';
 
 export const consoleTransport: Transport = {

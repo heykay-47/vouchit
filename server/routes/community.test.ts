@@ -5,8 +5,9 @@ import { signAuthToken } from '../lib/token.js';
 import { User } from '../models/User.js';
 import { Voucher } from '../models/Voucher.js';
 
-const requests: any[] = [];
-const activities: any[] = [];
+type TestDocument = Record<string, unknown> & { _id: { toString(): string } };
+const requests: TestDocument[] = [];
+const activities: TestDocument[] = [];
 
 vi.mock('../lib/db', () => ({ connectDb: vi.fn(async () => undefined) }));
 vi.mock('../models/VoucherRequest', () => {
@@ -18,7 +19,7 @@ vi.mock('../models/VoucherRequest', () => {
   return {
     VoucherRequest: {
       find: vi.fn(() => chain),
-      create: vi.fn(async (doc: any) => {
+      create: vi.fn(async (doc: Record<string, unknown>) => {
         const requestDoc = {
           _id: { toString: () => '507f1f77bcf86cd799439020' },
           ...doc,
@@ -41,7 +42,7 @@ vi.mock('../models/User', () => ({
   },
 }));
 vi.mock('../models/Notification', () => {
-  const notifications: any[] = [];
+  const notifications: TestDocument[] = [];
   const chain = {
     sort: () => chain,
     skip: () => chain,
@@ -50,7 +51,7 @@ vi.mock('../models/Notification', () => {
   return {
     Notification: {
       find: vi.fn(() => chain),
-      findOneAndUpdate: vi.fn(async (filter: any) => {
+      findOneAndUpdate: vi.fn(async (filter: { _id: string; userId: string }) => {
         if (String(filter._id) === '507f1f77bcf86cd799439099') return null;
         return {
           _id: filter._id,
@@ -82,15 +83,15 @@ describe('community routes', () => {
     requests.length = 0;
     activities.length = 0;
     vi.mocked(User.find).mockReset();
-    vi.mocked(User.find).mockResolvedValue([] as any);
+    vi.mocked(User.find).mockResolvedValue([]);
   });
 
   it.each([
     ['post', '/api/requests'],
-  ])('rejects business mutation %s %s', async (method, path) => {
+  ])('rejects business mutation %s %s', async (_method, path) => {
     const businessToken = signAuthToken({ userId: '507f1f77bcf86cd799439099' }, '1h');
 
-    await (request(createApp()) as any)[method](path)
+    await request(createApp()).post(path)
       .set('Cookie', [`auth_token=${businessToken}`])
       .send({ title: 'Need food voucher', description: 'Any grocery coupon', category: 'Food' })
       .expect(403);
@@ -158,7 +159,7 @@ describe('community routes', () => {
   it('includes the activity author username in the activity response', async () => {
     vi.mocked(User.find).mockResolvedValueOnce([
       { _id: { toString: () => '507f1f77bcf86cd799439011' }, username: 'alice' },
-    ] as any);
+    ] as unknown as Awaited<ReturnType<typeof User.find>>);
     activities.push({
       _id: { toString: () => '507f1f77bcf86cd799439030' },
       userId: { toString: () => '507f1f77bcf86cd799439011' },

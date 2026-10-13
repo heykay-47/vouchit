@@ -36,7 +36,7 @@ describe('shared control focus treatment', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Close' })).toHaveClass(
-      'focus-visible:outline-none',
+      'focus-visible:outline-hidden',
       'focus-visible:ring-2',
       'focus-visible:ring-ring',
       'focus-visible:ring-offset-2',

@@ -6,8 +6,8 @@ import { ApiError, asyncRoute, ok } from '../lib/http.js';
 import { publicVoucherFilter, toVoucherResponse, voucherAvailabilityFilter } from '../lib/voucher-serializer.js';
 import { getOptionalUserId, optionalAuth, requireAuth, requireRole, type AuthedRequest } from '../middleware/auth.js';
 import { Activity } from '../models/Activity.js';
-import { BusinessProfile } from '../models/BusinessProfile.js';
-import { Campaign } from '../models/Campaign.js';
+import { BusinessProfile, type BusinessProfileDocument } from '../models/BusinessProfile.js';
+import { Campaign, type CampaignDocument } from '../models/Campaign.js';
 import { Comment } from '../models/Comment.js';
 import { RedeemedVoucher } from '../models/RedeemedVoucher.js';
 import { ReportedVoucher } from '../models/ReportedVoucher.js';
@@ -44,7 +44,7 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
     .find({ status: 'active', expiryDate: { $gt: now } })
     .select('_id')
     .lean();
-  const activeCampaignIds = activeCampaigns.map((campaign: any) => campaign._id.toString());
+  const activeCampaignIds = activeCampaigns.map((campaign) => campaign._id.toString());
   const publicFilter = publicVoucherFilter(activeCampaignIds, now);
   const communityHistoryFilter = {
     $or: [{ sourceType: 'community' }, { sourceType: { $exists: false } }],
@@ -68,24 +68,24 @@ router.get('/', optionalAuth, asyncRoute(async (req, res) => {
     .skip(offset)
     .limit(limit)
     .lean();
-  const referencedCampaignIds = [...new Set(vouchers
-    .filter((voucher: any) => voucher.sourceType === 'campaign' && voucher.campaignId)
-    .map((voucher: any) => voucher.campaignId.toString()))];
+  const referencedCampaignIds = [...new Set(vouchers.flatMap((voucher) => (
+    voucher.sourceType === 'campaign' && voucher.campaignId ? [voucher.campaignId.toString()] : []
+  )))];
   const referencedCampaigns = referencedCampaignIds.length > 0
     ? await Campaign.find({ _id: { $in: referencedCampaignIds } }).lean()
     : [];
-  const campaignMap = new Map<string, any>(referencedCampaigns
-    .map((campaign: any) => [campaign._id.toString(), campaign]));
+  const campaignMap = new Map<string, CampaignDocument>(referencedCampaigns
+    .map((campaign) => [campaign._id.toString(), campaign]));
   const profileIds = [...new Set([...campaignMap.values()]
     .filter((campaign) => campaign.businessProfileId)
     .map((campaign) => campaign.businessProfileId.toString()))];
   const profiles = profileIds.length > 0
     ? await BusinessProfile.find({ _id: { $in: profileIds } }).lean()
     : [];
-  const profileMap = new Map<string, any>(profiles.map((profile: any) => [profile._id.toString(), profile]));
+  const profileMap = new Map<string, BusinessProfileDocument>(profiles.map((profile) => [profile._id.toString(), profile]));
 
   ok(res, {
-    vouchers: vouchers.map((voucher: any) => {
+    vouchers: vouchers.map((voucher) => {
       const campaign = voucher.campaignId ? campaignMap.get(voucher.campaignId.toString()) : undefined;
       const profile = campaign?.businessProfileId
         ? profileMap.get(campaign.businessProfileId.toString())
@@ -192,11 +192,11 @@ router.get('/:id/comments', asyncRoute(async (req, res) => {
     throw new ApiError(400, 'Invalid voucher id');
   }
   const comments = await Comment.find({ voucherId }).sort({ createdAt: 1 }).limit(100);
-  const users = await User.find({ _id: { $in: comments.map((comment: any) => comment.userId) } });
-  const names = new Map(users.map((user: any) => [user._id.toString(), user.username]));
+  const users = await User.find({ _id: { $in: comments.map((comment) => comment.userId) } });
+  const names = new Map(users.map((user) => [user._id.toString(), user.username]));
 
   ok(res, {
-    comments: comments.map((comment: any) => ({
+    comments: comments.map((comment) => ({
       id: comment._id.toString(),
       voucherId: comment.voucherId.toString(),
       userId: comment.userId.toString(),

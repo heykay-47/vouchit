@@ -52,7 +52,7 @@ describe('AuthModal', () => {
 
     expect(screen.getByRole('button', { name: 'sign up' })).toHaveClass(
       'min-h-11',
-      'focus-visible:outline-none',
+      'focus-visible:outline-hidden',
       'focus-visible:ring-2',
       'focus-visible:ring-ring',
       'focus-visible:ring-offset-2',
